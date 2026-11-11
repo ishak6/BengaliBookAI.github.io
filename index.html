@@ -36,6 +36,7 @@
       <div class="search-row"><span class="hint">সর্বোচ্চ ১২০০ অক্ষর</span><button id="ask" type="button" disabled>প্রশ্ন করুন ↗</button></div>
       <div id="status" role="status">ওয়েবসাইটের প্রাথমিক সংস্করণ। বই অনুসন্ধান API এখনো সংযুক্ত হয়নি।</div>
     </section>
+    <section id="answer-results" aria-live="polite"></section>
     <section class="features" id="about">
       <article class="feature"><div class="symbol">📚</div><b>বইভিত্তিক উত্তর</b><p>উত্তরের সঙ্গে বইয়ের নাম, অধ্যায়, পৃষ্ঠা ও উদ্ধৃতি দেখানোর ব্যবস্থা থাকবে।</p></article>
       <article class="feature"><div class="symbol">🔎</div><b>সূত্র যাচাই</b><p>বইয়ে তথ্য না পেলে অনুমান করে উত্তর না দিয়ে তা স্পষ্টভাবে জানাবে।</p></article>
@@ -45,11 +46,14 @@
   </main>
   <footer>© Bengali Book AI · বইয়ের স্বত্ব ও অনুমতির প্রতি শ্রদ্ধাশীল</footer>
   <script>
+    const API='https://bengali-book-ai-api.bengalibookai.workers.dev';
     const q=document.getElementById('question');
     const ask=document.getElementById('ask');
     const status=document.getElementById('status');
+    const results=document.getElementById('answer-results');
     q.addEventListener('input',()=>{ask.disabled=!q.value.trim();});
-    ask.addEventListener('click',()=>{status.textContent='প্রশ্ন গ্রহণ করা হয়েছে, কিন্তু বই অনুসন্ধান সার্ভার এখনো চালু হয়নি। Backend সংযুক্ত হলে এখানে সূত্রসহ উত্তর দেখাবে।';});
+    function section(title,text){const box=document.createElement('section');box.className='search-card';box.style.marginTop='16px';const h=document.createElement('h2');h.textContent=title;const p=document.createElement('p');p.style.whiteSpace='pre-wrap';p.style.lineHeight='1.8';p.textContent=text||'এখনো পাওয়া যায়নি।';box.append(h,p);return box;}
+    ask.addEventListener('click',async()=>{const question=q.value.trim();if(!question)return;ask.disabled=true;status.textContent='বইয়ের সূচিতে খোঁজা হচ্ছে…';results.replaceChildren();try{const response=await fetch(API+'/api/ask',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({question})});const data=await response.json();if(!response.ok)throw new Error(data.error||'সার্ভার সমস্যা');results.append(section('📚 বইভিত্তিক উত্তর',data.book_answer));if(data.general_explanation)results.append(section('✨ সাধারণ AI ব্যাখ্যা',data.general_explanation));const refs=document.createElement('section');refs.className='search-card';refs.style.marginTop='16px';const h=document.createElement('h2');h.textContent='🔎 বইয়ের সূত্র';refs.append(h);if(data.sources?.length){for(const s of data.sources){const item=document.createElement('p');item.style.lineHeight='1.7';item.textContent=(s.title||'বই')+(s.author?' — '+s.author:'')+' · পৃষ্ঠা '+s.page_number+(s.chapter?' · '+s.chapter:'')+'\n'+s.excerpt;refs.append(item);}}else{const p=document.createElement('p');p.textContent='এই প্রশ্নের সঙ্গে মেলে এমন কোনো indexed page পাওয়া যায়নি।';refs.append(p);}results.append(refs);status.textContent=data.ai_configured?'উত্তর তৈরি হয়েছে। বইয়ের সূত্র ও সাধারণ ব্যাখ্যা আলাদা করে দেখানো হয়েছে।':'বইয়ের পৃষ্ঠা অনুসন্ধান হয়েছে। AI ব্যাখ্যার জন্য Worker-এ AI provider secret সেট করতে হবে।';}catch(err){status.textContent='অনুসন্ধান ব্যর্থ: '+err.message;}finally{ask.disabled=!q.value.trim();}});
   </script>
 </body>
 </html>
