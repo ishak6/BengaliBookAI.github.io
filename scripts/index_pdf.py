@@ -55,9 +55,17 @@ def main() -> None:
     batch = []
     total_chars = 0
     indexed = 0
+    ocr_pages = 0
     for index, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
-        text = "\n".join(line.rstrip() for line in text.splitlines())
+        text = "\\n".join(line.rstrip() for line in text.splitlines())
+        if len(text) < 40:
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            image = Image.open(BytesIO(pix.tobytes("png")))
+            ocr_text = pytesseract.image_to_string(image, lang="ben+eng", config="--psm 6").strip()
+            if len(ocr_text) > len(text):
+                text = ocr_text
+                ocr_pages += 1
         if not text:
             continue
         if len(text) > 18000:
@@ -74,7 +82,7 @@ def main() -> None:
         indexed += result.get("received_pages", len(batch))
     doc.close()
     if indexed == 0:
-        raise SystemExit("No selectable text found. This PDF may be scanned; OCR is not yet enabled, so it was not marked ready.")
+        raise SystemExit("No selectable or OCR text found in this PDF; it was not marked ready.")
     result = post(f"/api/admin/books/{BOOK_ID}/complete", {})
     print(json.dumps({"ok": True, "book_id": BOOK_ID, "pages_indexed": indexed, "ocr_pages": ocr_pages,
                       "characters_extracted": total_chars, "final": result}, ensure_ascii=False, indent=2))
