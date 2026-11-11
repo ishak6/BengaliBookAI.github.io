@@ -8,18 +8,52 @@ on:
       - "worker/**"
       - ".github/workflows/deploy-worker.yml"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: bengali-book-ai-worker-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    name: Validate Cloudflare access and deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      - name: Check required GitHub secrets
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CF_TOKEN" ]; then
+            echo "::error::Missing repository secret CLOUDFLARE_API_TOKEN"
+            exit 1
+          fi
+          if [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "::error::Missing repository secret CLOUDFLARE_ACCOUNT_ID"
+            exit 1
+          fi
+          echo "Required Cloudflare secrets are present (values hidden)."
+
       - name: Install Wrangler
         run: npm install --global wrangler@4
+
+      - name: Verify Cloudflare authentication
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler whoami
+
       - name: Deploy Worker
         working-directory: worker
         env:
