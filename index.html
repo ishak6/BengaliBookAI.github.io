@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10251f">
+  <meta name="description" content="বাংলা বই থেকে নির্ভরযোগ্য উত্তর খুঁজুন — বইয়ের সূত্র ও সাধারণ AI ব্যাখ্যাসহ।">
+  <title>Bengali Book AI — বাংলা বইয়ের জ্ঞান</title>
+  <style>
+    :root{color-scheme:light;--ink:#14231e;--muted:#64736d;--paper:#f5f7f2;--card:#fff;--green:#176b4b;--line:#e2e9e2;--gold:#e8b85c}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif}
+    header{background:#10251f;color:white;padding:18px max(22px,calc((100% - 1080px)/2));display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .brand{display:flex;align-items:center;gap:12px;font-weight:750;font-size:18px}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,#d9f2d9,#e8b85c);display:grid;place-items:center;color:#15382b;font-size:23px}
+    header a{color:#d8eee2;text-decoration:none;font-size:14px}.wrap{max-width:960px;margin:auto;padding:52px 20px 70px}
+    .eyebrow{color:var(--green);font-weight:700;font-size:13px;letter-spacing:.04em}.hero{text-align:center;margin-bottom:30px}.hero h1{font-size:clamp(30px,5vw,48px);line-height:1.25;margin:12px 0}.hero p{color:var(--muted);font-size:16px;line-height:1.8;margin:0 auto;max-width:650px}
+    .search-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 14px 40px #183d2510}
+    textarea{display:block;width:100%;min-height:112px;resize:vertical;border:0;outline:0;font:inherit;font-size:17px;line-height:1.7;color:var(--ink);background:transparent;padding:8px}
+    .search-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:14px}.hint{font-size:12px;color:var(--muted)}button{border:0;border-radius:13px;background:var(--green);color:white;padding:13px 22px;font:inherit;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
+    .notice{margin-top:20px;padding:14px 16px;border-radius:14px;background:#edf4ed;color:#476157;font-size:13px;line-height:1.7}
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}.feature{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}.feature b{display:block;margin:7px 0}.feature p{font-size:13px;color:var(--muted);line-height:1.65;margin:0}.symbol{font-size:22px}
+    #status{margin:14px 4px 0;color:var(--muted);font-size:13px;min-height:22px}
+    footer{text-align:center;color:var(--muted);font-size:12px;padding:22px;border-top:1px solid var(--line)}
+    @media(max-width:650px){.wrap{padding-top:38px}.features{grid-template-columns:1fr}.search-row{align-items:flex-start;flex-direction:column}button{width:100%}header{padding:14px 18px}}
+  </style>
+</head>
+<body>
+  <header><div class="brand"><div class="logo" aria-hidden="true">বই</div><span>Bengali Book AI</span></div><a href="#about">আমাদের সম্পর্কে</a></header>
+  <main class="wrap">
+    <section class="hero">
+      <div class="eyebrow">বইয়ের জ্ঞান, সহজ বাংলায়</div>
+      <h1>আপনার প্রশ্নের উত্তর<br>খুঁজুন বাংলা বইয়ে</h1>
+      <p>অনুমতিপ্রাপ্ত ও উন্মুক্ত বাংলা বইয়ের তথ্যভান্ডার থেকে উত্তর খুঁজুন। বইয়ের সূত্র এবং সাধারণ AI ব্যাখ্যা আলাদা করে দেখানোর জন্য তৈরি হচ্ছে।</p>
+    </section>
+    <section class="search-card" aria-label="প্রশ্ন লিখুন">
+      <textarea id="question" maxlength="1200" placeholder="আপনার প্রশ্নটি বাংলায় লিখুন…"></textarea>
+      <div class="search-row"><span class="hint">সর্বোচ্চ ১২০০ অক্ষর</span><button id="ask" type="button" disabled>প্রশ্ন করুন ↗</button></div>
+      <div id="status" role="status">ওয়েবসাইটের প্রাথমিক সংস্করণ। বই অনুসন্ধান API এখনো সংযুক্ত হয়নি।</div>
+    </section>
+    <section class="features" id="about">
+      <article class="feature"><div class="symbol">📚</div><b>বইভিত্তিক উত্তর</b><p>উত্তরের সঙ্গে বইয়ের নাম, অধ্যায়, পৃষ্ঠা ও উদ্ধৃতি দেখানোর ব্যবস্থা থাকবে।</p></article>
+      <article class="feature"><div class="symbol">🔎</div><b>সূত্র যাচাই</b><p>বইয়ে তথ্য না পেলে অনুমান করে উত্তর না দিয়ে তা স্পষ্টভাবে জানাবে।</p></article>
+      <article class="feature"><div class="symbol">✨</div><b>আলাদা AI ব্যাখ্যা</b><p>বই থেকে পাওয়া তথ্য ও সাধারণ AI ব্যাখ্যা আলাদা অংশে দেখানো হবে।</p></article>
+    </section>
+    <div class="notice">গুরুত্বপূর্ণ: এখানে কেবল পাবলিক-ডোমেইন, উন্মুক্ত লাইসেন্সের অথবা স্পষ্ট অনুমতিপ্রাপ্ত বই ব্যবহার করা হবে। এই প্রাথমিক ওয়েব সংস্করণে এখনো কোনো বইয়ের উত্তর তৈরি বা যাচাই করা হচ্ছে না।</div>
+  </main>
+  <footer>© Bengali Book AI · বইয়ের স্বত্ব ও অনুমতির প্রতি শ্রদ্ধাশীল</footer>
+  <script>
+    const q=document.getElementById('question');
+    const ask=document.getElementById('ask');
+    const status=document.getElementById('status');
+    q.addEventListener('input',()=>{ask.disabled=!q.value.trim();});
+    ask.addEventListener('click',()=>{status.textContent='প্রশ্ন গ্রহণ করা হয়েছে, কিন্তু বই অনুসন্ধান সার্ভার এখনো চালু হয়নি। Backend সংযুক্ত হলে এখানে সূত্রসহ উত্তর দেখাবে।';});
+  </script>
+</body>
+</html>
