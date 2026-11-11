@@ -49,3 +49,15 @@ Set these as Worker secrets (never commit or send them in chat):
 - GitHub Releases is a starter workaround, not a guaranteed unlimited object-storage service.
 - The Worker does not yet extract PDF pages, perform OCR, build the FTS index, or generate book-grounded AI answers.
 - The admin-only upload dashboard is not implemented yet; the documented release + D1 workflow is manual.
+
+
+## Deploy from GitHub Actions (no local computer required)
+
+A workflow is available at `.github/workflows/deploy-worker.yml`. Before it can deploy, add these repository secrets in **Settings → Secrets and variables → Actions → New repository secret**:
+
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with permission to edit Workers and access the target account.
+- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID for the account containing the D1 database.
+
+Keep both values private; never paste them into chat or commit them to the repository. After saving both secrets, open **Actions → Deploy Bengali Book AI Worker → Run workflow**. A successful run deploys the Worker. Then open the deployment log and copy the `workers.dev` URL; test `/health` and `/api/books`.
+
+The workflow does not configure Telegram secrets or the Telegram webhook. Add `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and `ADMIN_TELEGRAM_ID` in the Cloudflare Worker settings before enabling the bot. Do not deploy until the required Cloudflare secrets are set.
