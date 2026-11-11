@@ -5,6 +5,9 @@ import urllib.request
 import urllib.error
 from urllib.parse import urlparse
 import fitz
+from io import BytesIO
+from PIL import Image
+import pytesseract
 
 API = os.environ.get("WORKER_API_URL", "https://bengali-book-ai-api.bengalibookai.workers.dev").rstrip("/")
 TOKEN = os.environ["WORKER_ADMIN_API_TOKEN"]
@@ -73,7 +76,7 @@ def main() -> None:
     if indexed == 0:
         raise SystemExit("No selectable text found. This PDF may be scanned; OCR is not yet enabled, so it was not marked ready.")
     result = post(f"/api/admin/books/{BOOK_ID}/complete", {})
-    print(json.dumps({"ok": True, "book_id": BOOK_ID, "pages_indexed": indexed,
+    print(json.dumps({"ok": True, "book_id": BOOK_ID, "pages_indexed": indexed, "ocr_pages": ocr_pages,
                       "characters_extracted": total_chars, "final": result}, ensure_ascii=False, indent=2))
 
 if __name__ == "__main__":
