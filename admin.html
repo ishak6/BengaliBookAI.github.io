@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#10251f"><title>Admin · Bengali Book AI</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6f1;color:#172820;font-family:system-ui,"Noto Sans Bengali",sans-serif}main{max-width:720px;margin:32px auto;padding:20px}.card{background:white;border:1px solid #dce6dd;border-radius:18px;padding:22px;margin:14px 0}h1{font-size:26px}p,small{color:#617269;line-height:1.65}label{display:block;font-weight:650;margin:14px 0 6px}input,select,textarea{width:100%;padding:12px;border:1px solid #cbd8ce;border-radius:10px;font:inherit;background:#fff}button{border:0;border-radius:10px;padding:13px 18px;background:#176b4b;color:#fff;font-weight:700;font:inherit;cursor:pointer;margin-top:16px}button:disabled{opacity:.5}#status{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px;padding:12px;background:#eef4ee;border-radius:10px;min-height:45px}.danger{color:#9a4a22}.row{display:flex;gap:10px}.row>*{flex:1}@media(max-width:560px){main{padding:12px}.row{display:block}}
+</style></head><body><main><h1>📚 Bengali Book AI — Admin</h1><p>এই প্যানেলটি শুধু অ্যাডমিনের জন্য। API token শুধু এই ট্যাবের মেমোরিতে থাকবে; ব্রাউজারে সংরক্ষণ করা হবে না। কখনো token কাউকে পাঠাবেন না।</p>
+<section class="card"><label for="token">Admin API token</label><input id="token" type="password" autocomplete="off" placeholder="Cloudflare Worker secret"><small>Cloudflare Worker secret: ADMIN_API_TOKEN (কমপক্ষে ৩২ অক্ষরের random secret)</small></section>
+<form id="bookForm" class="card">
+<label for="title">বইয়ের নাম *</label><input id="title" required maxlength="240">
+<div class="row"><div><label for="author">লেখক</label><input id="author" maxlength="200"></div><div><label for="id">Book ID (ঐচ্ছিক)</label><input id="id" placeholder="auto-generated"></div></div>
+<label for="rights">বই ব্যবহারের অধিকার *</label><select id="rights" required><option value="public_domain">Public domain</option><option value="open_license">Open license</option><option value="permission_granted">লিখিত অনুমতি আছে</option></select>
+<label for="rightsNote">লাইসেন্স/অনুমতির প্রমাণ ও উৎস *</label><textarea id="rightsNote" rows="3" required placeholder="লাইসেন্সের নাম, অনুমতির বিবরণ বা পাবলিক ডোমেইনের প্রমাণ"></textarea>
+<label for="source">মূল উৎসের URL</label><input id="source" type="url" placeholder="https://...">
+<label for="pdf">GitHub Release PDF URL *</label><input id="pdf" type="url" required placeholder="https://github.com/ishak6/BengaliBookAI.github.io/releases/download/.../book.pdf">
+<p class="danger"><b>সতর্কতা:</b> কপিরাইটযুক্ত বইয়ের অনুমতি ছাড়া PDF প্রকাশ করবেন না। GitHub Release-এর PDF public হবে।</p>
+<button id="submit" type="submit">বই নিবন্ধন করুন</button><div id="status" role="status">প্রথমে token দিন। এরপর GitHub Release-এ PDF আপলোড করে তার URL এখানে দিন।</div>
+</form>
+<section class="card"><b>নিবন্ধনের পর PDF index করার ধাপ</b><ol><li>GitHub repository → Releases → New release খুলুন।</li><li>অনুমতিপ্রাপ্ত PDF ফাইল attach করে release publish করুন।</li><li>উপরের ফর্মে release asset URL দিয়ে বই register করুন।</li><li>GitHub → Actions → “Index PDF into D1” → Run workflow।</li><li>বইয়ের ID এবং একই PDF URL দিন। Workflow সফল হলে বই ready হবে।</li></ol></section>
+</main>
+<script>
+const API="https://bengali-book-ai-api.bengalibookai.workers.dev";
+const $=id=>document.getElementById(id);
+$("bookForm").addEventListener("submit",async e=>{e.preventDefault();const token=$("token").value.trim();if(token.length<32){$("status").textContent="কমপক্ষে ৩২ অক্ষরের Admin API token দিন।";return}
+$("submit").disabled=true;$("status").textContent="বই নিবন্ধন হচ্ছে…";
+try{const res=await fetch(API+"/api/admin/books",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({title:$("title").value,author:$("author").value,id:$("id").value,rights_type:$("rights").value,rights_note:$("rightsNote").value,source_url:$("source").value,storage_url:$("pdf").value})});const data=await res.json();$("status").textContent=JSON.stringify(data,null,2);if(res.ok){$("status").textContent+="\n\nপরের ধাপ: GitHub Actions → Index PDF into D1 workflow চালান।"} }catch(err){$("status").textContent="Request failed: "+err.message}finally{$("submit").disabled=false}});
+</script></body></html>
