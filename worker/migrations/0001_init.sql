@@ -33,6 +33,21 @@ CREATE VIRTUAL TABLE IF NOT EXISTS book_pages_fts USING fts5(
   tokenize = 'unicode61'
 );
 
+CREATE TRIGGER IF NOT EXISTS book_pages_fts_insert AFTER INSERT ON book_pages BEGIN
+  INSERT INTO book_pages_fts(rowid, book_id, page_number, chapter, content)
+  VALUES (new.id, new.book_id, new.page_number, COALESCE(new.chapter, ''), new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS book_pages_fts_delete AFTER DELETE ON book_pages BEGIN
+  DELETE FROM book_pages_fts WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS book_pages_fts_update AFTER UPDATE ON book_pages BEGIN
+  DELETE FROM book_pages_fts WHERE rowid = old.id;
+  INSERT INTO book_pages_fts(rowid, book_id, page_number, chapter, content)
+  VALUES (new.id, new.book_id, new.page_number, COALESCE(new.chapter, ''), new.content);
+END;
+
 CREATE TABLE IF NOT EXISTS admin_audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   admin_telegram_id TEXT NOT NULL,
