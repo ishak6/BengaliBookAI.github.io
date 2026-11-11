@@ -13,11 +13,5 @@
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "BOOKS_BUCKET",
-      "bucket_name": "bengali-book-ai-books"
-    }
-  ],
-  "vars": { "APP_ENV": "production" }
+  "vars": { "APP_ENV": "production", "BOOK_STORAGE": "github-releases" }
 }
