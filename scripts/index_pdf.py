@@ -58,7 +58,7 @@ def main() -> None:
     ocr_pages = 0
     for index, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
-        text = "\\n".join(line.rstrip() for line in text.splitlines())
+        text = "\n".join(line.rstrip() for line in text.splitlines())
         if len(text) < 40:
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
             image = Image.open(BytesIO(pix.tobytes("png")))
