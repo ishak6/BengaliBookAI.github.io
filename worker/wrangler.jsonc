@@ -4,7 +4,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-11-10",
   "workers_dev": true,
-  "observability": { "enabled": true },
+  "observability": {
+    "enabled": true
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -13,5 +15,10 @@
       "migrations_dir": "migrations"
     }
   ],
-  "vars": { "APP_ENV": "production", "BOOK_STORAGE": "github-releases" }
+  "vars": {
+    "APP_ENV": "production",
+    "BOOK_STORAGE": "github-releases",
+    "AI_BASE_URL": "https://openrouter.ai/api/v1",
+    "AI_MODEL": "openrouter/free"
+  }
 }
