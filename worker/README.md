@@ -1,52 +1,51 @@
-# Bengali Book AI Worker — Phase 1
+# Bengali Book AI Worker
 
-This Cloudflare Worker is the initial API and Telegram webhook foundation.
+## No-card book storage: GitHub Releases
 
-## Routes
+This project uses public GitHub Release assets for PDF storage instead of Cloudflare R2. This avoids enabling a paid R2 subscription or adding a payment card. GitHub Releases is suitable for a small initial catalogue, but it is not unlimited storage; check GitHub's current limits and terms.
 
-- `GET /health` — health and configuration status.
-- `POST /telegram/webhook` — Telegram webhook protected by Telegram's secret-token header.
-- `POST /api/ask` — intentionally returns HTTP 501 until book ingestion and retrieval are implemented.
+### Add a book file (manual starter workflow)
 
-## Create Cloudflare resources
+1. Open repository Releases: https://github.com/ishak6/BengaliBookAI.github.io/releases
+2. Create a release with a tag such as `books-v1`.
+3. Upload only books that are public-domain, openly licensed, or for which you have explicit distribution permission.
+4. Publish the release and copy the asset browser-download URL. It should look like `https://github.com/OWNER/REPO/releases/download/TAG/filename.pdf`.
+5. Add a row to the D1 `books` table. Set `storage_key` to that exact URL and use `status='ready'` only after verifying the URL works.
 
-1. Create a D1 database named `bengali-book-ai-db`.
-2. Create an R2 bucket named `bengali-book-ai-books`.
-3. Replace `database_id` in `wrangler.jsonc` with the D1 database ID from Cloudflare.
-
-Apply the database schema:
-
-```bash
-npx wrangler d1 migrations apply bengali-book-ai-db --remote
+Example SQL (replace every example value):
+```sql
+INSERT INTO books
+(id, title, author, language, rights_type, rights_note, storage_key, status)
+VALUES
+('book-001', 'বইয়ের নাম', 'লেখকের নাম', 'bn', 'open_license',
+ 'লাইসেন্স ও উৎসের বিবরণ', 'https://github.com/OWNER/REPO/releases/download/TAG/FILE.pdf', 'ready');
 ```
 
-Deploy:
+### API routes
 
-```bash
-npx wrangler deploy
-```
+- `GET /health` — service status and storage mode.
+- `GET /api/books` — list ready books from D1.
+- `GET /api/books/:id/file` — streams a public GitHub Release PDF through the Worker.
+- `POST /telegram/webhook` — Telegram webhook.
+- `POST /api/ask` — remains HTTP 501 until PDF text extraction, page indexing, Bengali retrieval, and AI response generation are implemented.
 
-## Worker secrets
+### Cloudflare setup
 
-Set secrets using Wrangler; never commit them into Git:
+1. Keep the D1 binding named `DB` in `wrangler.jsonc`.
+2. No R2 bucket or R2 subscription is required.
+3. Apply the D1 schema if it has not already been applied: `npx wrangler d1 migrations apply bengali-book-ai-db --remote`.
+4. Deploy from the `worker` directory with `npx wrangler deploy`.
 
-```bash
-npx wrangler secret put TELEGRAM_BOT_TOKEN
-npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
-npx wrangler secret put ADMIN_TELEGRAM_ID
-```
+### Telegram secrets
 
-Use your numeric Telegram user ID for `ADMIN_TELEGRAM_ID`. The webhook secret must be a long random string using only letters, digits, underscore, and hyphen.
+Set these as Worker secrets (never commit or send them in chat):
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_WEBHOOK_SECRET`
+- `ADMIN_TELEGRAM_ID` (your numeric Telegram user ID)
 
-## Telegram webhook
+## Important limitations
 
-After deployment, set the webhook to:
-
-- URL: `https://YOUR-WORKER-SUBDOMAIN.workers.dev/telegram/webhook`
-- `secret_token`: the exact value stored as `TELEGRAM_WEBHOOK_SECRET`
-
-Do not post bot tokens or webhook secrets in chat, screenshots, or repository files.
-
-## Current limitations
-
-This is a Phase 1 foundation, not a complete book-answering system. PDF ingestion, OCR, page extraction, Bengali retrieval, AI explanations, and admin book-upload commands are not implemented yet. The API deliberately does not invent book-grounded answers before retrieval exists.
+- GitHub Release assets are public; do not upload private or restricted books.
+- GitHub Releases is a starter workaround, not a guaranteed unlimited object-storage service.
+- The Worker does not yet extract PDF pages, perform OCR, build the FTS index, or generate book-grounded AI answers.
+- The admin-only upload dashboard is not implemented yet; the documented release + D1 workflow is manual.
