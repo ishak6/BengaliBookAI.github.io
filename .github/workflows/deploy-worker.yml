@@ -45,6 +45,10 @@ jobs:
           fi
           echo "Required Cloudflare secrets are present (values hidden)."
 
+      - name: Validate Worker JavaScript
+        working-directory: worker
+        run: node --check src/index.js
+
       - name: Install Wrangler
         run: npm install --global wrangler@4
 

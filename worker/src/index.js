@@ -1,103 +1,28 @@
-const JSON_HEADERS = {
-  "content-type": "application/json; charset=utf-8",
-  "cache-control": "no-store"
-};
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
-}
-function isAdmin(userId, env) {
-  return Boolean(env.ADMIN_TELEGRAM_ID) && String(userId) === String(env.ADMIN_TELEGRAM_ID);
-}
-async function telegramRequest(env, method, payload) {
-  if (!env.TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
-  const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload)
-  });
-  if (!response.ok) throw new Error(`Telegram API returned HTTP ${response.status}`);
-  return response.json();
-}
-async function sendMessage(env, chatId, text) {
-  return telegramRequest(env, "sendMessage", { chat_id: chatId, text, disable_web_page_preview: true });
-}
-async function listBooks(env) {
-  if (!env.DB) return json({ error: "Database is not configured" }, 503);
-  try {
-    const result = await env.DB.prepare("SELECT id, title, author, language, rights_type, rights_note, status FROM books WHERE status = 'ready' ORDER BY title COLLATE NOCASE").all();
-    return json({ books: result.results || [] });
-  } catch (error) {
-    console.error("Book list query failed:", error);
-    return json({ error: "Could not load books. Check that the D1 schema has been applied." }, 503);
-  }
-}
-async function serveBookFile(bookId, env) {
-  if (!env.DB) return json({ error: "Database is not configured" }, 503);
-  const book = await env.DB.prepare("SELECT storage_key FROM books WHERE id = ? AND status = 'ready' LIMIT 1").bind(bookId).first();
-  if (!book?.storage_key) return json({ error: "Book file not found" }, 404);
-  let assetUrl;
-  try { assetUrl = new URL(book.storage_key); } catch { return json({ error: "Invalid book storage reference" }, 500); }
-  if (assetUrl.protocol !== "https:" || assetUrl.hostname !== "github.com" || !assetUrl.pathname.includes("/releases/download/")) {
-    return json({ error: "Book file must use a public GitHub Release asset URL" }, 400);
-  }
-  const upstream = await fetch(assetUrl.toString(), { redirect: "follow" });
-  if (!upstream.ok || !upstream.body) return json({ error: "Book file is unavailable from GitHub Releases" }, 502);
-  const headers = new Headers();
-  headers.set("content-type", upstream.headers.get("content-type") || "application/pdf");
-  headers.set("cache-control", "public, max-age=3600");
-  headers.set("x-content-type-options", "nosniff");
-  const length = upstream.headers.get("content-length");
-  if (length) headers.set("content-length", length);
-  return new Response(upstream.body, { status: 200, headers });
-}
-async function handleTelegram(request, env) {
-  if (!env.TELEGRAM_WEBHOOK_SECRET) return json({ error: "Webhook secret is not configured" }, 503);
-  if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.TELEGRAM_WEBHOOK_SECRET) return json({ error: "Unauthorized" }, 401);
-  let update;
-  try { update = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
-  const message = update.message;
-  if (!message?.chat?.id || typeof message.text !== "string") return json({ ok: true, ignored: true });
-  const text = message.text.trim(), chatId = message.chat.id, userId = message.from?.id;
-  try {
-    if (text === "/start") {
-      await sendMessage(env, chatId, "স্বাগতম Bengali Book AI-তে।\n\nপ্রস্তুত বইয়ের তালিকা দেখতে /books লিখুন। বইভিত্তিক প্রশ্নোত্তর ও উদ্ধৃতি-সহ উত্তর পরবর্তী ধাপে যুক্ত হবে।");
-    } else if (text === "/help") {
-      await sendMessage(env, chatId, "কমান্ড:\n/start — শুরু\n/books — প্রস্তুত বইয়ের তালিকা\n/help — সাহায্য");
-    } else if (text === "/books") {
-      if (!env.DB) await sendMessage(env, chatId, "বইয়ের ডেটাবেস এখনো সংযুক্ত হয়নি।");
-      else {
-        const result = await env.DB.prepare("SELECT title, author FROM books WHERE status = 'ready' ORDER BY title COLLATE NOCASE LIMIT 30").all();
-        const rows = result.results || [];
-        await sendMessage(env, chatId, rows.length ? "প্রস্তুত বই:\n" + rows.map((book, i) => `${i + 1}. ${book.title}${book.author ? " — " + book.author : ""}`).join("\n") : "এখনো কোনো প্রস্তুত বই যোগ করা হয়নি।");
-      }
-    } else if (text === "/admin") {
-      await sendMessage(env, chatId, isAdmin(userId, env) ? "Admin access যাচাই হয়েছে। বই যোগ করার upload panel এখনো তৈরি হয়নি।" : "এই কমান্ড ব্যবহারের অনুমতি নেই।");
-    } else {
-      await sendMessage(env, chatId, "প্রশ্ন পেয়েছি। বইয়ের searchable page index ও AI retrieval এখনো তৈরি হয়নি; তাই অনুমান করে বইয়ের উত্তর দিচ্ছি না।");
-    }
-  } catch (error) {
-    console.error("Telegram message handling failed:", error);
-    return json({ error: "Message handling failed" }, 502);
-  }
-  return json({ ok: true });
-}
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method === "GET" && url.pathname === "/health") return json({
-      ok: true, service: "Bengali Book AI API", phase: 1, storage: "github-releases",
-      telegramConfigured: Boolean(env.TELEGRAM_BOT_TOKEN), databaseConfigured: Boolean(env.DB)
-    });
-    if (request.method === "GET" && url.pathname === "/api/books") return listBooks(env);
-    const fileMatch = url.pathname.match(/^\/api\/books\/([^/]+)\/file$/);
-    if (request.method === "GET" && fileMatch) {
-      let bookId;
-      try { bookId = decodeURIComponent(fileMatch[1]); } catch { return json({ error: "Invalid book ID" }, 400); }
-      return serveBookFile(bookId, env);
-    }
-    if (request.method === "POST" && url.pathname === "/telegram/webhook") return handleTelegram(request, env);
-    if (request.method === "POST" && url.pathname === "/api/ask") return json({
-      error: "Book search is not ready yet",
-      message: "বইয়ের page text index ও retrieval পরবর্তী ধাপে যুক্ত হবে।"
-    }, 501);
-    return json({ error: "Not found" }, 404);
-  }
-};
+const H={"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*","access-control-allow-methods":"GET,POST,OPTIONS","access-control-allow-headers":"Content-Type,Authorization,X-Telegram-Bot-Api-Secret-Token"};
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:H});
+const admin=(r,e)=>Boolean(e.ADMIN_API_TOKEN&&e.ADMIN_API_TOKEN.length>=32&&r.headers.get("authorization")===`Bearer ${e.ADMIN_API_TOKEN}`);
+const releaseUrl=s=>{try{const u=new URL(s);return u.protocol==="https:"&&u.hostname==="github.com"&&u.pathname.startsWith("/ishak6/BengaliBookAI.github.io/releases/download/")&&u.pathname.toLowerCase().endsWith(".pdf")}catch{return false}};
+const bookId=s=>String(s||"").trim().toLowerCase().normalize("NFKD").replace(/[^a-z0-9\u0980-\u09ff]+/g,"-").replace(/^-+|-+$/g,"").slice(0,70);
+async function books(e){try{const r=await e.DB.prepare("SELECT id,title,author,language,rights_type,status FROM books WHERE status='ready' ORDER BY title COLLATE NOCASE").all();return json({books:r.results||[]})}catch{return json({error:"D1 schema/query error"},503)}}
+async function createBook(r,e){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}
+const id=bookId(b.id||b.title),title=String(b.title||"").trim(),rights=String(b.rights_type||""),note=String(b.rights_note||"").trim(),url=String(b.storage_url||"").trim();
+if(!id||!title||title.length>240||!["public_domain","open_license","permission_granted"].includes(rights)||!note||!releaseUrl(url))return json({error:"title, rights_type, rights_note and valid PDF release URL are required"},400);
+try{await e.DB.prepare("INSERT INTO books(id,title,author,language,source_url,rights_type,rights_note,storage_key,status) VALUES(?,?,?,'bn',?,?,?,?,'processing')").bind(id,title,String(b.author||"").slice(0,200)||null,String(b.source_url||"").slice(0,1000)||null,rights,note.slice(0,1000),url).run();return json({ok:true,book:{id,title,status:"processing"}} ,201)}catch(err){return json({error:String(err).includes("UNIQUE")?"Book ID already exists":"Could not register book"},409)}}
+async function addPages(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
+const exists=await e.DB.prepare("SELECT id FROM books WHERE id=?").bind(id).first();if(!exists)return json({error:"Book not found"},404);
+const q=[];for(const p of b.pages){const n=Number(p.page_number),c=String(p.content||"").trim();if(!Number.isInteger(n)||n<1||!c||c.length>18000)return json({error:"Invalid page number or content length"},400);q.push(e.DB.prepare("INSERT INTO book_pages(book_id,page_number,chapter,content) VALUES(?,?,?,?) ON CONFLICT(book_id,page_number) DO UPDATE SET chapter=excluded.chapter,content=excluded.content").bind(id,n,String(p.chapter||"").slice(0,240)||null,c))}
+try{await e.DB.batch(q);return json({ok:true,book_id:id,received_pages:q.length})}catch(err){console.error(err);return json({error:"Page batch failed"},503)}}
+async function completeBook(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);const n=await e.DB.prepare("SELECT COUNT(*) count FROM book_pages WHERE book_id=?").bind(id).first();if(!n||Number(n.count)<1)return json({error:"No indexed pages"},409);await e.DB.prepare("UPDATE books SET status='ready',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({ok:true,book_id:id,status:"ready",indexed_pages:Number(n.count)})}
+function fts(q){const w=[...new Set(q.match(/[\p{L}\p{N}]+/gu)||[])].filter(x=>[...x].length>=2).slice(0,8);return w.map(x=>`"${x.replace(/"/g,'""')}"*`).join(" OR ")}
+async function ask(r,e){let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}const q=String(b.question||"").trim();if(!q||q.length>1200)return json({error:"প্রশ্ন ১-১২০০ অক্ষরের মধ্যে লিখুন"},400);
+let rows=[];const match=fts(q);if(match){try{const x=await e.DB.prepare("SELECT p.book_id,p.page_number,p.chapter,p.content,b.title,b.author FROM book_pages_fts f JOIN book_pages p ON p.id=f.rowid JOIN books b ON b.id=p.book_id WHERE book_pages_fts MATCH ? AND b.status='ready' ORDER BY bm25(book_pages_fts) LIMIT 8").bind(match).all();rows=x.results||[]}catch(err){console.error("FTS search failed",err)}}
+if(!rows.length)return json({ok:true,found:false,book_answer:"যুক্ত বইগুলোর সূচিতে এই প্রশ্নের নির্ভরযোগ্য প্রমাণ পাওয়া যায়নি।",general_explanation:null,ai_configured:Boolean(e.AI_API_KEY),sources:[]});
+let ai=null;if(e.AI_API_KEY){try{const base=String(e.AI_BASE_URL||"https://api.openai.com/v1").replace(/\/+$/,"");const evidence=rows.map((x,i)=>`[S${i+1}] ${x.title}, পৃষ্ঠা ${x.page_number}: ${x.content.slice(0,1800)}`).join("\n\n");const resp=await fetch(base+"/chat/completions",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${e.AI_API_KEY}`},body:JSON.stringify({model:e.AI_MODEL||"gpt-4o-mini",temperature:0.2,messages:[{role:"system",content:"বাংলায় উত্তর দাও। বইয়ের উত্তর কেবল প্রদত্ত প্রমাণের ভিত্তিতে দাও, তথ্য না থাকলে বলো পাওয়া যায়নি। সাধারণ ব্যাখ্যা বইয়ের বক্তব্য থেকে আলাদা রাখো। কেবল JSON: {book_answer:string,general_explanation:string}। [S1] citation ব্যবহার করো।"},{role:"user",content:`প্রশ্ন: ${q}\nপ্রমাণ:\n${evidence}`} ]})});if(resp.ok){const d=await resp.json();const raw=d.choices?.[0]?.message?.content||"";try{ai=JSON.parse(raw)}catch{ai={book_answer:raw,general_explanation:""}}}}catch(err){console.error("AI provider error",err)}}
+return json({ok:true,found:true,book_answer:String(ai?.book_answer||"প্রাসঙ্গিক বইয়ের অংশ পাওয়া গেছে। নিচের পৃষ্ঠা-সূত্র যাচাই করুন।"),general_explanation:ai?.general_explanation||null,ai_configured:Boolean(e.AI_API_KEY),sources:rows.map((x,i)=>({source_id:`S${i+1}`,book_id:x.book_id,title:x.title,author:x.author,page_number:x.page_number,chapter:x.chapter,excerpt:x.content.slice(0,1200)}))})}
+async function telegram(r,e){if(!e.TELEGRAM_WEBHOOK_SECRET)return json({error:"Webhook secret missing"},503);if(r.headers.get("X-Telegram-Bot-Api-Secret-Token")!==e.TELEGRAM_WEBHOOK_SECRET)return json({error:"Unauthorized"},401);let u;try{u=await r.json()}catch{return json({error:"Invalid JSON"},400)}const m=u.message;if(!m?.chat?.id||typeof m.text!=="string")return json({ok:true,ignored:true});const t=m.text.trim(),id=m.chat.id;let msg="Bengali Book AI: ওয়েবসাইটে বই অনুসন্ধান করুন।";if(t==="/start")msg="স্বাগতম Bengali Book AI-তে। /books দিয়ে বইয়ের তালিকা দেখুন।";else if(t==="/help")msg="/start — শুরু, /books — বইয়ের তালিকা, /help — সাহায্য";else if(t==="/books"){const x=await e.DB.prepare("SELECT title,author FROM books WHERE status='ready' LIMIT 30").all();msg=(x.results||[]).map((v,i)=>`${i+1}. ${v.title}`).join("\n")||"এখনো বই যোগ করা হয়নি।"}else if(t==="/admin")msg=String(m.from?.id)===String(e.ADMIN_TELEGRAM_ID)&&e.ADMIN_TELEGRAM_ID?"Admin যাচাই হয়েছে।":"অনুমতি নেই।";try{await fetch(`https://api.telegram.org/bot${e.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({chat_id:id,text:msg})})}catch{return json({error:"Telegram send failed"},502)}return json({ok:true})}
+export default {async fetch(r,e){const u=new URL(r.url);if(r.method==="OPTIONS")return new Response(null,{status:204,headers:H});if(r.method==="GET"&&u.pathname==="/health")return json({ok:true,service:"Bengali Book AI API",phase:2,storage:"github-releases",databaseConfigured:Boolean(e.DB),adminConfigured:Boolean(e.ADMIN_API_TOKEN),aiConfigured:Boolean(e.AI_API_KEY),telegramConfigured:Boolean(e.TELEGRAM_BOT_TOKEN)});
+if(r.method==="GET"&&u.pathname==="/api/books")return books(e);if(r.method==="POST"&&u.pathname==="/api/ask")return ask(r,e);if(r.method==="POST"&&u.pathname==="/api/admin/books")return createBook(r,e);
+const p=u.pathname.match(/^\/api\/admin\/books\/([^/]+)\/pages$/);if(r.method==="POST"&&p)return addPages(r,e,decodeURIComponent(p[1]));
+const c=u.pathname.match(/^\/api\/admin\/books\/([^/]+)\/complete$/);if(r.method==="POST"&&c)return completeBook(r,e,decodeURIComponent(c[1]));
+const f=u.pathname.match(/^\/api\/books\/([^/]+)\/file$/);if(r.method==="GET"&&f){const b=await e.DB.prepare("SELECT storage_key FROM books WHERE id=? AND status='ready'").bind(decodeURIComponent(f[1])).first();if(!b||!releaseUrl(b.storage_key))return json({error:"Book file not found"},404);const x=await fetch(b.storage_key);if(!x.ok)return json({error:"Release asset unavailable"},502);return new Response(x.body,{headers:{"content-type":"application/pdf","cache-control":"public,max-age=3600","access-control-allow-origin":"*","x-content-type-options":"nosniff"}})}
+if(r.method==="POST"&&u.pathname==="/telegram/webhook")return telegram(r,e);return json({error:"Not found"},404)}};

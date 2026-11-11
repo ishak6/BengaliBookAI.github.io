@@ -1,63 +1,60 @@
 # Bengali Book AI Worker
 
-## No-card book storage: GitHub Releases
+## Current Phase 2 architecture
 
-This project uses public GitHub Release assets for PDF storage instead of Cloudflare R2. This avoids enabling a paid R2 subscription or adding a payment card. GitHub Releases is suitable for a small initial catalogue, but it is not unlimited storage; check GitHub's current limits and terms.
+- GitHub Pages hosts the Bengali question UI and the noindex admin panel.
+- Cloudflare Worker validates admin requests, queries D1 and calls an optional OpenAI-compatible AI provider.
+- D1 stores book metadata, extracted page text and the FTS5 search index.
+- Public GitHub Release assets store permitted PDF files (no R2 payment card required).
+- GitHub Actions downloads a selected release PDF, extracts selectable text with PyMuPDF and sends page batches to the Worker.
 
-### Add a book file (manual starter workflow)
+## Add an authorized book
 
-1. Open repository Releases: https://github.com/ishak6/BengaliBookAI.github.io/releases
-2. Create a release with a tag such as `books-v1`.
-3. Upload only books that are public-domain, openly licensed, or for which you have explicit distribution permission.
-4. Publish the release and copy the asset browser-download URL. It should look like `https://github.com/OWNER/REPO/releases/download/TAG/filename.pdf`.
-5. Add a row to the D1 `books` table. Set `storage_key` to that exact URL and use `status='ready'` only after verifying the URL works.
+Only add public-domain books, open-license books, or books for which you have explicit written distribution permission. GitHub Release assets are public.
 
-Example SQL (replace every example value):
-```sql
-INSERT INTO books
-(id, title, author, language, rights_type, rights_note, storage_key, status)
-VALUES
-('book-001', 'বইয়ের নাম', 'লেখকের নাম', 'bn', 'open_license',
- 'লাইসেন্স ও উৎসের বিবরণ', 'https://github.com/OWNER/REPO/releases/download/TAG/FILE.pdf', 'ready');
-```
+1. Open [GitHub Releases](https://github.com/ishak6/BengaliBookAI.github.io/releases) and create a release.
+2. Attach the permitted PDF and publish the release. Copy the asset URL ending in `.pdf`.
+3. In Cloudflare → Workers & Pages → `bengali-book-ai-api` → Settings → Variables and Secrets, add secret `ADMIN_API_TOKEN`. Use a unique random value of at least 32 characters. Never commit or share it.
+4. Add the exact same value as a GitHub repository Actions secret named `WORKER_ADMIN_API_TOKEN`.
+5. Open [Admin panel](https://ishak6.github.io/BengaliBookAI.github.io/admin.html). Enter the token, book title, rights evidence and PDF asset URL. Submit.
+6. The panel returns a Book ID. Open GitHub → Actions → **Index PDF into D1** → Run workflow. Enter that Book ID and the same PDF URL.
+7. When the workflow succeeds, check `/api/books`. The book should appear with status ready.
 
-### API routes
+The admin panel does not store the token in localStorage or cookies; it stays in the page's memory and is sent over HTTPS. Clear the field and close the tab after use.
 
-- `GET /health` — service status and storage mode.
-- `GET /api/books` — list ready books from D1.
-- `GET /api/books/:id/file` — streams a public GitHub Release PDF through the Worker.
-- `POST /telegram/webhook` — Telegram webhook.
-- `POST /api/ask` — remains HTTP 501 until PDF text extraction, page indexing, Bengali retrieval, and AI response generation are implemented.
+## AI provider
 
-### Cloudflare setup
+The Worker defaults to OpenRouter's `openrouter/free` model. Add secret `AI_API_KEY` in Cloudflare Worker settings. The key is never stored in GitHub or sent to the browser. The AI answer is generated from retrieved book pages and separates book-grounded answer from general explanation. If the key is absent or provider call fails, the API still returns matching book excerpts and page citations without inventing an AI answer.
+
+Optional non-secret variables:
+- `AI_BASE_URL` (default `https://openrouter.ai/api/v1`)
+- `AI_MODEL` (default `openrouter/free`)
+
+## API routes
+
+- `GET /health` — Worker, D1, admin, AI and Telegram configuration flags (never secret values).
+- `GET /api/books` — list ready books.
+- `GET /api/books/:id/file` — stream a public GitHub Release PDF.
+- `POST /api/ask` — Bengali FTS5 retrieval and optional AI answer with page references.
+- `POST /api/admin/books` — register a book (Bearer `ADMIN_API_TOKEN`).
+- `POST /api/admin/books/:id/pages` — insert/update 1–25 extracted pages per batch (admin only).
+- `POST /api/admin/books/:id/complete` — mark a book ready only after at least one page is indexed (admin only).
+- `POST /telegram/webhook` — optional Telegram webhook.
+
+## PDF extraction limitations
+
+The indexing workflow currently extracts selectable PDF text. It does not yet run OCR on scanned/image-only PDFs. If a PDF has no selectable text, the workflow fails safely and does not mark the book ready. Bengali FTS5 search is a baseline lexical search; it is not semantic/vector search. Chapter headings are currently not inferred reliably and may remain blank.
+
+## Cloudflare setup
 
 1. Keep the D1 binding named `DB` in `wrangler.jsonc`.
-2. No R2 bucket or R2 subscription is required.
-3. Apply the D1 schema if it has not already been applied: `npx wrangler d1 migrations apply bengali-book-ai-db --remote`.
-4. Deploy from the `worker` directory with `npx wrangler deploy`.
+2. Apply the existing D1 migration if it has not already been applied:
+   `npx wrangler d1 migrations apply bengali-book-ai-db --remote`.
+3. Deploy with GitHub Actions **Deploy Bengali Book AI Worker**. Required GitHub secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+4. Add Worker secrets `ADMIN_API_TOKEN` and `AI_API_KEY` in Cloudflare. Optional Telegram secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_ID`.
 
-### Telegram secrets
+Never paste any secret into chat, source files, commit messages or screenshots.
 
-Set these as Worker secrets (never commit or send them in chat):
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_WEBHOOK_SECRET`
-- `ADMIN_TELEGRAM_ID` (your numeric Telegram user ID)
+## Storage and rights
 
-## Important limitations
-
-- GitHub Release assets are public; do not upload private or restricted books.
-- GitHub Releases is a starter workaround, not a guaranteed unlimited object-storage service.
-- The Worker does not yet extract PDF pages, perform OCR, build the FTS index, or generate book-grounded AI answers.
-- The admin-only upload dashboard is not implemented yet; the documented release + D1 workflow is manual.
-
-
-## Deploy from GitHub Actions (no local computer required)
-
-A workflow is available at `.github/workflows/deploy-worker.yml`. Before it can deploy, add these repository secrets in **Settings → Secrets and variables → Actions → New repository secret**:
-
-- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with permission to edit Workers and access the target account.
-- `CLOUDFLARE_ACCOUNT_ID`: the Cloudflare account ID for the account containing the D1 database.
-
-Keep both values private; never paste them into chat or commit them to the repository. After saving both secrets, open **Actions → Deploy Bengali Book AI Worker → Run workflow**. A successful run deploys the Worker. Then open the deployment log and copy the `workers.dev` URL; test `/health` and `/api/books`.
-
-The workflow does not configure Telegram secrets or the Telegram webhook. Add `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and `ADMIN_TELEGRAM_ID` in the Cloudflare Worker settings before enabling the bot. Do not deploy until the required Cloudflare secrets are set.
+GitHub Release assets are public and have repository/service limits. Do not upload private, pirated, or restricted books. The project accepts only public-domain, open-license or explicitly permitted content.
