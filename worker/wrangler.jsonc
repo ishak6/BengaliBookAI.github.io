@@ -9,7 +9,7 @@
     {
       "binding": "DB",
       "database_name": "bengali-book-ai-db",
-      "database_id": "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID",
+      "database_id": "28b0c1ea-56ef-4b33-913d-971badceade6",
       "migrations_dir": "migrations"
     }
   ],
