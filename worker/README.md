@@ -6,7 +6,7 @@
 - Cloudflare Worker validates admin requests, queries D1 and calls an optional OpenAI-compatible AI provider.
 - D1 stores book metadata, extracted page text and the FTS5 search index.
 - Public GitHub Release assets store permitted PDF files (no R2 payment card required).
-- GitHub Actions downloads a selected release PDF, extracts selectable text with PyMuPDF and sends page batches to the Worker.
+- GitHub Actions downloads a selected release PDF, extracts text with PyMuPDF, uses Bengali+English Tesseract OCR for scanned/low-text pages, and sends page batches to the Worker.
 
 ## Add an authorized book
 
@@ -43,7 +43,7 @@ Optional non-secret variables:
 
 ## PDF extraction limitations
 
-The indexing workflow currently extracts selectable PDF text. It does not yet run OCR on scanned/image-only PDFs. If a PDF has no selectable text, the workflow fails safely and does not mark the book ready. Bengali FTS5 search is a baseline lexical search; it is not semantic/vector search. Chapter headings are currently not inferred reliably and may remain blank.
+The indexing workflow extracts selectable PDF text and falls back to Bengali+English Tesseract OCR on scanned/low-text pages. OCR quality depends on scan resolution, page orientation and print quality; manually verify citations and page text. PDFs are limited to 80 MiB and 2,500 pages per run. Bengali FTS5 search is a baseline lexical search; it is not semantic/vector search. Chapter headings are currently not inferred reliably and may remain blank.
 
 ## Cloudflare setup
 
