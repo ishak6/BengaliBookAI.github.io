@@ -36,6 +36,8 @@ jobs:
           sudo apt-get install -y tesseract-ocr tesseract-ocr-ben tesseract-ocr-eng
       - name: Install PDF and OCR libraries
         run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.4 Pillow pytesseract
+      - name: Run OCR quality unit tests
+        run: python -m unittest discover -s scripts -p 'test_ocr_quality.py' -v
       - name: Extract PDF pages and index in D1
         env:
           WORKER_ADMIN_API_TOKEN: ${{ secrets.WORKER_ADMIN_API_TOKEN }}
