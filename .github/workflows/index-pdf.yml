@@ -43,3 +43,15 @@ jobs:
           PDF_URL: ${{ inputs.release_url }}
           WORKER_API_URL: https://bengali-book-ai-api.bengalibookai.workers.dev
         run: python scripts/index_pdf.py
+
+      - name: Mark book indexing as failed
+        if: failure()
+        env:
+          WORKER_ADMIN_API_TOKEN: ${{ secrets.WORKER_ADMIN_API_TOKEN }}
+          BOOK_ID: ${{ inputs.book_id }}
+          WORKER_API_URL: https://bengali-book-ai-api.bengalibookai.workers.dev
+        run: |
+          curl --silent --show-error --fail-with-body -X POST "$WORKER_API_URL/api/admin/books/$BOOK_ID/fail" \
+            -H "Authorization: Bearer $WORKER_ADMIN_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"reason":"GitHub Actions indexing failed"}' || true
