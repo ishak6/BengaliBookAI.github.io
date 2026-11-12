@@ -107,9 +107,9 @@ async function start(){
   const book=books.books?.find(b=>b.id===id);
   if(!book)throw new Error("বইটি পাওয়া যায়নি বা প্রকাশিত নেই।");
   $("#title").textContent=book.title||"বই পড়ুন";
-  const task=pdfjsLib.getDocument({url:API+"/api/books/"+encodeURIComponent(id)+"/file",rangeChunkSize:262144,disableRange:false,disableStream:true,disableAutoFetch:true});
+  const task=pdfjsLib.getDocument({url:API+"/api/books/"+encodeURIComponent(id)+"/file",rangeChunkSize:65536,disableRange:false,disableStream:true,disableAutoFetch:true});
   pdf=await task.promise;
-  page=Math.min(pdf.numPages,Math.max(1,Number(localStorage.getItem(storeKey))||1));
+  page=1;
   $("#loading").textContent="বইয়ের পৃষ্ঠা প্রস্তুত হচ্ছে…";
   updateProgress();await render();
  }catch(e){showError("বই খোলা যায়নি: "+(e.message||"PDF load error"))}
