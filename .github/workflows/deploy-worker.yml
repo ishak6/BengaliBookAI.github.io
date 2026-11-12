@@ -49,6 +49,9 @@ jobs:
         working-directory: worker
         run: node --check src/index.js
 
+      - name: Run AI quality harness
+        run: npm test --prefix worker
+
       - name: Install Wrangler
         run: npm install --global wrangler@4
 
