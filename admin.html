@@ -19,6 +19,17 @@
 <script>
 const API="https://bengali-book-ai-api.bengalibookai.workers.dev";
 const $=id=>document.getElementById(id);
+$("generateToken").addEventListener("click",()=>{
+  const bytes=new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  $("token").value=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+  $("token").type="text";
+  $("status").textContent="নতুন ৬৪ অক্ষরের token তৈরি হয়েছে। এটি কপি করে GitHub → Settings → Secrets and variables → Actions → WORKER_ADMIN_API_TOKEN-এ সংরক্ষণ করুন। Token কাউকে পাঠাবেন না।";
+});
+$("showToken").addEventListener("click",()=>{
+  $("token").type=$("token").type==="password"?"text":"password";
+  $("showToken").textContent=$("token").type==="password"?"দেখাও":"লুকাও";
+});
 $("bookForm").addEventListener("submit",async e=>{e.preventDefault();const token=$("token").value.trim();if(token.length<32){$("status").textContent="কমপক্ষে ৩২ অক্ষরের Admin API token দিন।";return}
 $("submit").disabled=true;$("status").textContent="বই নিবন্ধন হচ্ছে…";
 try{const res=await fetch(API+"/api/admin/books",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({title:$("title").value,author:$("author").value,id:$("id").value,rights_type:$("rights").value,rights_note:$("rightsNote").value,source_url:$("source").value,storage_url:$("pdf").value})});const data=await res.json();$("status").textContent=JSON.stringify(data,null,2);if(res.ok){$("status").textContent+="\n\nপরের ধাপ: GitHub Actions → Index PDF into D1 workflow চালান।"} }catch(err){$("status").textContent="Request failed: "+err.message}finally{$("submit").disabled=false}});
