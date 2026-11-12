@@ -1,0 +1,36 @@
+name: Generate and backfill book covers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/generate_covers.py"
+      - ".github/workflows/generate-covers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bengali-book-cover-generation
+  cancel-in-progress: false
+
+jobs:
+  covers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PDF renderer
+        run: python -m pip install --disable-pip-version-check PyMuPDF==1.26.4
+      - name: Generate persistent covers for all uploaded books
+        env:
+          WORKER_ADMIN_API_TOKEN: ${{ secrets.WORKER_ADMIN_API_TOKEN }}
+          WORKER_API_URL: https://bengali-book-ai-api.bengalibookai.workers.dev
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/generate_covers.py
