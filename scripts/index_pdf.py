@@ -1,12 +1,14 @@
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from collections import deque
 import urllib.request
 import urllib.error
 from urllib.parse import urlparse
 import fitz
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageOps
 import pytesseract
 
 API = os.environ.get("WORKER_API_URL", "https://bengali-book-ai-api.bengalibookai.workers.dev").rstrip("/")
@@ -56,27 +58,50 @@ def main() -> None:
     total_chars = 0
     indexed = 0
     ocr_pages = 0
-    for index, page in enumerate(doc, start=1):
-        text = page.get_text("text").strip()
-        text = "\n".join(line.rstrip() for line in text.splitlines())
-        if len(text) < 40:
-            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-            image = Image.open(BytesIO(pix.tobytes("png")))
-            ocr_text = pytesseract.image_to_string(image, lang="ben+eng", config="--psm 6").strip()
-            if len(ocr_text) > len(text):
-                text = ocr_text
-                ocr_pages += 1
+    # Extract native text serially, but overlap OCR for image-only pages.
+    # A small bounded queue keeps memory predictable on large PDFs.
+    def run_ocr(png_bytes: bytes) -> str:
+        image = Image.open(BytesIO(png_bytes)).convert("L")
+        image = ImageOps.autocontrast(image)
+        return pytesseract.image_to_string(image, lang="ben+eng", config="--oem 1 --psm 6").strip()
+
+    pending = deque()
+    def consume(item):
+        nonlocal_dummy = None
+        page_number, native_text, future = item
+        ocr_text = future.result() if future else ""
+        chosen = ocr_text if len(ocr_text) > len(native_text) else native_text
+        return page_number, chosen, bool(future and ocr_text and len(ocr_text) > len(native_text))
+
+    def save_page(item):
+        nonlocal_state = item
+        nonlocal total_chars, indexed, ocr_pages, batch
+        page_number, text, used_ocr = item
+        if used_ocr:
+            ocr_pages += 1
         if not text:
-            continue
-        if len(text) > 18000:
-            text = text[:18000]
-        batch.append({"page_number": index, "chapter": None, "content": text})
+            return
+        text = text[:18000]
+        batch.append({"page_number": page_number, "chapter": None, "content": text})
         total_chars += len(text)
-        if len(batch) == 25:
+        if len(batch) >= 25:
             result = post(f"/api/admin/books/{BOOK_ID}/pages", {"pages": batch})
             indexed += result.get("received_pages", len(batch))
             print(f"Indexed {indexed} text pages…")
             batch = []
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        for index, page in enumerate(doc, start=1):
+            native = "\n".join(line.rstrip() for line in page.get_text("text").strip().splitlines())
+            future = None
+            if len(native) < 40:
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False, colorspace=fitz.csGRAY)
+                future = pool.submit(run_ocr, pix.tobytes("png"))
+            pending.append((index, native, future))
+            if len(pending) >= 4:
+                save_page(consume(pending.popleft()))
+        while pending:
+            save_page(consume(pending.popleft()))
     if batch:
         result = post(f"/api/admin/books/{BOOK_ID}/pages", {"pages": batch})
         indexed += result.get("received_pages", len(batch))
