@@ -134,7 +134,7 @@ test("homepage exposes image upload, camera capture and image API wiring", async
   const html = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   assert.match(html, /id="image-file"/);
   assert.match(html, /capture="environment"/);
-  assert.match(html, //api/ask-image/);
+  assert.equal(html.includes("/api/ask-image"), true);
   assert.match(html, /recognized_text/);
 });
 
