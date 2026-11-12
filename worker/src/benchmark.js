@@ -2,8 +2,8 @@ export function normalizeAnswer(value) {
   return String(value ?? "")
     .normalize("NFKC")
     .toLocaleLowerCase("bn")
-    .replace(/[^\\p{L}\\p{N}%/]+/gu, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/[^\p{L}\p{N}%/]+/gu, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
