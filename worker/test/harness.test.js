@@ -117,7 +117,7 @@ test("book-only image question refuses to invent an answer without indexed evide
     form.append("mode", "book");
     const response = await worker.fetch(makeRequest("/api/ask-image", { method: "POST", body: form }), {
       AI_API_KEY: "test-only-placeholder",
-      DB: dbWithoutMatches()
+      DB: dbWithoutMatches
     });
     const data = await json(response);
     assert.equal(response.status, 200);
