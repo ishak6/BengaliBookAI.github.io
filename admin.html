@@ -1,36 +1,18 @@
 <!doctype html>
 <html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#10251f"><title>Admin · Bengali Book AI</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f3f6f1;color:#172820;font-family:system-ui,"Noto Sans Bengali",sans-serif}main{max-width:720px;margin:32px auto;padding:20px}.card{background:white;border:1px solid #dce6dd;border-radius:18px;padding:22px;margin:14px 0}h1{font-size:26px}p,small{color:#617269;line-height:1.65}label{display:block;font-weight:650;margin:14px 0 6px}input,select,textarea{width:100%;padding:12px;border:1px solid #cbd8ce;border-radius:10px;font:inherit;background:#fff}button{border:0;border-radius:10px;padding:13px 18px;background:#176b4b;color:#fff;font-weight:700;font:inherit;cursor:pointer;margin-top:16px}button:disabled{opacity:.5}#status{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px;padding:12px;background:#eef4ee;border-radius:10px;min-height:45px}.danger{color:#9a4a22}.row{display:flex;gap:10px}.row>*{flex:1}@media(max-width:560px){main{padding:12px}.row{display:block}}
-</style></head><body><main><h1>📚 Bengali Book AI — Admin</h1><p>এই প্যানেলটি শুধু অ্যাডমিনের জন্য। API token শুধু এই ট্যাবের মেমোরিতে থাকবে; ব্রাউজারে সংরক্ষণ করা হবে না। কখনো token কাউকে পাঠাবেন না।</p>
-<section class="card"><label for="token">Admin API token</label><input id="token" type="password" autocomplete="off" placeholder="Generate or paste a secret"><div class="row"><button type="button" id="generateToken">নিরাপদ token তৈরি</button><button type="button" id="showToken">দেখাও</button></div><small>কমপক্ষে ৩২ অক্ষরের random secret। তৈরি token GitHub Actions Secret WORKER_ADMIN_API_TOKEN হিসেবেও যোগ করতে হবে।</small></section>
-<form id="bookForm" class="card">
-<label for="title">বইয়ের নাম *</label><input id="title" required maxlength="240">
-<div class="row"><div><label for="author">লেখক</label><input id="author" maxlength="200"></div><div><label for="id">Book ID (ঐচ্ছিক)</label><input id="id" placeholder="auto-generated"></div></div>
-<label for="rights">বই ব্যবহারের অধিকার *</label><select id="rights" required><option value="public_domain">Public domain</option><option value="open_license">Open license</option><option value="permission_granted">লিখিত অনুমতি আছে</option></select>
-<label for="rightsNote">লাইসেন্স/অনুমতির প্রমাণ ও উৎস *</label><textarea id="rightsNote" rows="3" required placeholder="লাইসেন্সের নাম, অনুমতির বিবরণ বা পাবলিক ডোমেইনের প্রমাণ"></textarea>
-<label for="source">মূল উৎসের URL</label><input id="source" type="url" placeholder="https://...">
-<label for="pdf">GitHub Release PDF URL *</label><input id="pdf" type="url" required placeholder="https://github.com/ishak6/BengaliBookAI.github.io/releases/download/.../book.pdf">
-<p class="danger"><b>সতর্কতা:</b> কপিরাইটযুক্ত বইয়ের অনুমতি ছাড়া PDF প্রকাশ করবেন না। GitHub Release-এর PDF public হবে।</p>
-<button id="submit" type="submit">বই নিবন্ধন করুন</button><div id="status" role="status">প্রথমে token দিন। এরপর GitHub Release-এ PDF আপলোড করে তার URL এখানে দিন।</div>
-</form>
-<section class="card"><b>নিবন্ধনের পর PDF index করার ধাপ</b><ol><li>GitHub repository → Releases → New release খুলুন।</li><li>অনুমতিপ্রাপ্ত PDF ফাইল attach করে release publish করুন।</li><li>উপরের ফর্মে release asset URL দিয়ে বই register করুন।</li><li>GitHub → Actions → “Index PDF into D1” → Run workflow।</li><li>বইয়ের ID এবং একই PDF URL দিন। Workflow সফল হলে বই ready হবে।</li></ol></section>
-</main>
-<script>
-const API="https://bengali-book-ai-api.bengalibookai.workers.dev";
-const $=id=>document.getElementById(id);
-$("generateToken").addEventListener("click",()=>{
-  const bytes=new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  $("token").value=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
-  $("token").type="text";
-  $("status").textContent="নতুন ৬৪ অক্ষরের token তৈরি হয়েছে। এটি কপি করে GitHub → Settings → Secrets and variables → Actions → WORKER_ADMIN_API_TOKEN-এ সংরক্ষণ করুন। Token কাউকে পাঠাবেন না।";
-});
-$("showToken").addEventListener("click",()=>{
-  $("token").type=$("token").type==="password"?"text":"password";
-  $("showToken").textContent=$("token").type==="password"?"দেখাও":"লুকাও";
-});
-$("bookForm").addEventListener("submit",async e=>{e.preventDefault();const token=$("token").value.trim();if(token.length<32){$("status").textContent="কমপক্ষে ৩২ অক্ষরের Admin API token দিন।";return}
-$("submit").disabled=true;$("status").textContent="বই নিবন্ধন হচ্ছে…";
-try{const res=await fetch(API+"/api/admin/books",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({title:$("title").value,author:$("author").value,id:$("id").value,rights_type:$("rights").value,rights_note:$("rightsNote").value,source_url:$("source").value,storage_url:$("pdf").value})});const data=await res.json();$("status").textContent=JSON.stringify(data,null,2);if(res.ok){$("status").textContent+="\n\nপরের ধাপ: GitHub Actions → Index PDF into D1 workflow চালান।"} }catch(err){$("status").textContent="Request failed: "+err.message}finally{$("submit").disabled=false}});
+*{box-sizing:border-box}body{margin:0;background:#f3f6f1;color:#172820;font-family:system-ui,"Noto Sans Bengali",sans-serif}main{max-width:680px;margin:32px auto;padding:18px}.card{background:white;border:1px solid #dce6dd;border-radius:18px;padding:22px;margin:14px 0}h1{font-size:26px}p,small{color:#617269;line-height:1.65}label{display:block;font-weight:650;margin:14px 0 6px}input{width:100%;padding:13px;border:1px solid #cbd8ce;border-radius:10px;font:inherit;background:#fff}input[type=file]{padding:16px;background:#f7faf7}button{border:0;border-radius:10px;padding:13px 18px;background:#176b4b;color:#fff;font-weight:700;font:inherit;cursor:pointer;margin-top:16px;width:100%}button:disabled{opacity:.5}#status{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px;padding:12px;background:#eef4ee;border-radius:10px;min-height:45px}.check{display:flex;gap:10px;align-items:flex-start;font-weight:500}.check input{width:auto;margin-top:5px}.muted{font-size:13px}
+</style></head><body><main><h1>📚 Bengali Book AI</h1><p>এখানে শুধু PDF নির্বাচন করে Upload & Process চাপুন। বইয়ের নাম ফাইলের নাম থেকে নেওয়া হবে; PDF-এর লেখা স্বয়ংক্রিয়ভাবে বের করে বইয়ের সূচিতে যোগ হবে।</p>
+<section class="card"><label for="token">Admin token</label><input id="token" type="password" autocomplete="off" placeholder="আপনার Admin token"><small>এই ব্রাউজার ট্যাবে একবার দিলে পরেরবার মনে থাকবে। অন্য কারও সঙ্গে token শেয়ার করবেন না।</small>
+<form id="uploadForm"><label for="pdf">বইয়ের PDF</label><input id="pdf" type="file" accept="application/pdf,.pdf" required><small>সর্বোচ্চ ৮০ MB এবং ২,৫০০ পৃষ্ঠা। ফাইলের নাম বইয়ের নাম হিসেবে ব্যবহৃত হবে।</small>
+<label class="check"><input id="rights" type="checkbox" required><span>আমি নিশ্চিত করছি, এই PDF পাবলিক ডোমেইন, উন্মুক্ত লাইসেন্সের, অথবা ব্যবহারের স্পষ্ট অনুমতিপ্রাপ্ত।</span></label>
+<button id="submit" type="submit">📤 Upload & Process</button></form><div id="status" role="status">PDF নির্বাচন করুন।</div></section>
+<p class="muted">নিরাপত্তা: PDF GitHub Release-এ public asset হিসেবে রাখা হবে। অনুমতি নেই এমন কপিরাইটযুক্ত বই আপলোড করবেন না।</p>
+</main><script>
+const API="https://bengali-book-ai-api.bengalibookai.workers.dev";const $=id=>document.getElementById(id);
+$("token").value=sessionStorage.getItem("bbai_admin_token")||"";
+$("token").addEventListener("change",()=>sessionStorage.setItem("bbai_admin_token",$("token").value.trim()));
+$("uploadForm").addEventListener("submit",async e=>{e.preventDefault();const token=$("token").value.trim(),file=$("pdf").files[0];if(token.length<32){$("status").textContent="Admin token সঠিকভাবে দিন।";return}if(!file){$("status").textContent="একটি PDF নির্বাচন করুন।";return}if(file.size>80*1024*1024){$("status").textContent="PDF ৮০ MB-এর বেশি হতে পারবে না।";return}if(!$("rights").checked){$("status").textContent="বই ব্যবহারের অধিকার নিশ্চিত করতে হবে।";return}
+$("submit").disabled=true;$("status").textContent="PDF আপলোড হচ্ছে… পৃষ্ঠা বেশি হলে কিছু সময় লাগতে পারে।";
+try{const form=new FormData();form.append("pdf",file);form.append("rights_confirmed","yes");const res=await fetch(API+"/api/admin/upload",{method:"POST",headers:{authorization:"Bearer "+token},body:form});const data=await res.json();if(!res.ok)throw new Error(data.error||"Upload failed");$("status").textContent="আপলোড গ্রহণ করা হয়েছে।\nবই: "+data.book.title+"\nঅবস্থা: "+data.book.status+"\n\nPDF indexing workflow শুরু হয়েছে। শেষ হলে বইটি ওয়েবসাইটে পাওয়া যাবে।";$("uploadForm").reset();}catch(err){$("status").textContent="সমস্যা: "+err.message;}finally{$("submit").disabled=false}});
 </script></body></html>
