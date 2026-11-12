@@ -18,7 +18,7 @@ async function uploadPdf(r,e){
  if(file.size<8||file.size>80*1024*1024)return json({error:"PDF must be between 8 bytes and 80 MiB"},413);
  if(form.get("rights_confirmed")!=="yes")return json({error:"বই ব্যবহারের অধিকার নিশ্চিত করুন"},400);
  const bytes=await file.arrayBuffer();const head=new TextDecoder().decode(bytes.slice(0,5));if(head!=="%PDF-")return json({error:"Invalid PDF file"},400);
- const title=file.name.replace(/\\.pdf$/i,"").replace(/[_-]+/g," ").trim().slice(0,240)||"Uploaded Bengali book";
+ const title=file.name.replace(/\.pdf$/i,"").replace(/[_-]+/g," ").trim().slice(0,240)||"Uploaded Bengali book";
  const id=(bookId(title)||"book")+"-"+crypto.randomUUID().slice(0,8);
  const api="https://api.github.com/repos/ishak6/BengaliBookAI.github.io";
  const ghHeaders={"authorization":"Bearer "+e.GITHUB_API_TOKEN,"accept":"application/vnd.github+json","x-github-api-version":"2022-11-28","user-agent":"BengaliBookAI"};
@@ -27,7 +27,7 @@ async function uploadPdf(r,e){
  try{
   const cr=await fetch(api+"/releases",{method:"POST",headers:{...ghHeaders,"content-type":"application/json"},body:JSON.stringify({tag_name:tag,name:title+" — Bengali Book AI",draft:false,prerelease:false})});
   const cd=await cr.json();if(!cr.ok)throw new Error(cd.message||"Could not create GitHub Release");release=cd;
-  const uploadUrl=String(release.upload_url||"").replace(/\\{\\?name,label\\}$/,"")+"?name="+encodeURIComponent(file.name);
+  const uploadUrl=String(release.upload_url||"").replace(/\{\?name,label\}$/,"")+"?name="+encodeURIComponent(file.name);
   const up=await fetch(uploadUrl,{method:"POST",headers:{...ghHeaders,"content-type":"application/pdf"},body:bytes});
   const ud=await up.json();if(!up.ok)throw new Error(ud.message||"Could not upload PDF asset");
   const assetUrl=ud.browser_download_url;
