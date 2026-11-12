@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "index.html"
+      - "reader.html"
+      - "library.html"
       - "admin.html"
       - "scripts/index_pdf.py"
       - "worker/package.json"
