@@ -43,7 +43,7 @@ jobs:
       - name: Validate Worker JavaScript
         run: node --check worker/src/index.js
       - name: Validate PDF indexer Python syntax
-        run: python -m py_compile scripts/index_pdf.py
+        run: python -m py_compile scripts/index_pdf.py scripts/generate_covers.py
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
