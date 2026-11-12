@@ -13,7 +13,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: book-index-${{ inputs.book_id }}
@@ -44,6 +44,7 @@ jobs:
           BOOK_ID: ${{ inputs.book_id }}
           PDF_URL: ${{ inputs.release_url }}
           WORKER_API_URL: https://bengali-book-ai-api.bengalibookai.workers.dev
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/index_pdf.py
 
       - name: Mark book indexing as failed
