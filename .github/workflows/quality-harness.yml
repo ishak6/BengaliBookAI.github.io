@@ -33,6 +33,9 @@ jobs:
       - name: Run deterministic AI quality tests
         run: npm test --prefix worker
 
+      - name: Validate Bengali benchmark dataset and runner
+        run: node worker/scripts/run-benchmark.js
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
