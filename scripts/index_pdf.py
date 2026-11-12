@@ -11,6 +11,7 @@ from io import BytesIO
 from PIL import Image, ImageOps
 import pytesseract
 from ocr_quality import needs_ocr, choose_text
+from generate_covers import upload_cover
 
 API = os.environ.get("WORKER_API_URL", "https://bengali-book-ai-api.bengalibookai.workers.dev").rstrip("/")
 TOKEN = os.environ["WORKER_ADMIN_API_TOKEN"]
@@ -52,6 +53,8 @@ def main() -> None:
     if not pdf_bytes.startswith(b"%PDF-"):
         raise SystemExit("The selected release asset is not a valid PDF.")
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    print("Generating a persistent first-page cover thumbnail…")
+    upload_cover(pdf_bytes, PDF_URL)
     if doc.page_count < 1 or doc.page_count > 2500:
         raise SystemExit(f"Unsupported page count: {doc.page_count}; allowed range is 1–2500.")
     print(f"Extracting text from {doc.page_count} pages with native-text quality checks…")
