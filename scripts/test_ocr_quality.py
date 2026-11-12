@@ -13,11 +13,11 @@ class OCRQualityTests(unittest.TestCase):
         self.assertGreater(text_quality(text), 0.72)
 
     def test_replacement_character_text_needs_ocr(self):
-        text = ("বাংলা\\ufffdলেখা অ\\ufffdক্ষর ভুল\\ufffdভাবে পড়া হয়েছে। " * 8)
+        text = ("বাংলা\ufffdলেখা অ\ufffdক্ষর ভুল\ufffdভাবে পড়া হয়েছে। " * 8)
         self.assertTrue(needs_ocr(text))
 
     def test_choose_cleaner_ocr_when_native_text_is_corrupt(self):
-        native = ("বাংলা\\ufffdলেখা অ\\ufffdক্ষর ভুল\\ufffdভাবে পড়া হয়েছে। " * 8)
+        native = ("বাংলা\ufffdলেখা অ\ufffdক্ষর ভুল\ufffdভাবে পড়া হয়েছে। " * 8)
         ocr = ("বাংলা ভাষার লেখা সঠিকভাবে শনাক্ত করা হয়েছে। " * 8)
         self.assertEqual(choose_text(native, ocr), ocr.strip())
 
