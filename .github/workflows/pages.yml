@@ -8,6 +8,7 @@ on:
       - "reader.html"
       - "library.html"
       - "admin.html"
+      - "soo.html"
       - "scripts/index_pdf.py"
       - "worker/package.json"
       - "worker/test/**"
