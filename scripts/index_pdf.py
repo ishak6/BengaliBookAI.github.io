@@ -54,7 +54,10 @@ def main() -> None:
         raise SystemExit("The selected release asset is not a valid PDF.")
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     print("Generating a persistent first-page cover thumbnail…")
-    upload_cover(pdf_bytes, PDF_URL)
+    try:
+        upload_cover(pdf_bytes, PDF_URL)
+    except Exception as cover_error:
+        print(f"Cover generation warning (PDF indexing will continue): {cover_error}")
     if doc.page_count < 1 or doc.page_count > 2500:
         raise SystemExit(f"Unsupported page count: {doc.page_count}; allowed range is 1–2500.")
     print(f"Extracting text from {doc.page_count} pages with native-text quality checks…")
