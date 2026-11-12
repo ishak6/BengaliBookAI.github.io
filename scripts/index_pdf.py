@@ -25,7 +25,7 @@ def post(path: str, payload: dict) -> dict:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         API + path, data=data, method="POST",
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + TOKEN}
+        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "BengaliBookAI-Indexer/1.0 (+https://github.com/ishak6/BengaliBookAI.github.io)", "Authorization": "Bearer " + TOKEN}
     )
     try:
         with urllib.request.urlopen(req, timeout=90) as response:
