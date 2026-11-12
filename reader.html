@@ -1,21 +1,137 @@
 <!doctype html>
 <html lang="bn">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta http-equiv="Cache-Control" content="no-cache">
-  <title>বই খুলছে… · Bengali Book AI</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171b20">
+<title>বই পড়ুন · Bengali Book AI</title>
+<style>
+:root{color-scheme:dark;--bg:#171b20;--panel:#20262d;--ink:#edf0e9;--muted:#a4ada8;--accent:#b9d6a7;--paper:#f3ead7;--paper-ink:#302b24}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:system-ui,"Noto Sans Bengali",sans-serif}
+body.sepia{--bg:#d8c7a7;--panel:#cbb995;--ink:#332b20;--muted:#6f604b;--accent:#5b7046;--paper:#f4e8ce;--paper-ink:#332b20;color-scheme:light}
+body.light{--bg:#e9ece8;--panel:#fff;--ink:#202820;--muted:#69756c;--accent:#286b4b;--paper:#fff;--paper-ink:#202820;color-scheme:light}
+#app{height:100dvh;display:flex;flex-direction:column}
+.top{height:58px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel);box-shadow:0 2px 14px #0002;z-index:3}
+.iconbtn{border:0;background:transparent;color:var(--ink);font-size:21px;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;cursor:pointer}
+.iconbtn:active{background:#8883}.booktitle{min-width:0;flex:1}.booktitle strong{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.booktitle small{color:var(--muted);font-size:11px}
+.tools{display:flex;gap:3px;align-items:center}.tools button{font-size:18px}
+.stage{position:relative;flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px 10px 24px;background:var(--bg)}
+#pageWrap{position:relative;margin:auto;max-width:100%;box-shadow:0 5px 28px #0004;background:var(--paper);min-height:120px}
+#pdfCanvas{display:block;max-width:100%;height:auto}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:25px}
+.bottom{flex:none;background:var(--panel);padding:9px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -2px 14px #0002;z-index:3}
+.progressrow{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+#progress{flex:1;accent-color:var(--accent);min-width:0}
+.navrow{display:flex;align-items:center;justify-content:space-between;margin-top:7px}
+.navrow button,.pill{border:1px solid #8884;border-radius:20px;padding:7px 13px;background:transparent;color:var(--ink);font:inherit;font-size:12px}
+#pageLabel{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.settings{position:absolute;right:12px;top:66px;z-index:5;width:min(300px,calc(100vw - 24px));padding:16px;border-radius:18px;background:var(--panel);box-shadow:0 12px 35px #0005;border:1px solid #8883;display:none}
+.settings.open{display:block}.settings h3{margin:0 0 12px;font-size:15px}.settingrow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0;font-size:13px}.themechoices{display:flex;gap:6px}.themechoices button{border:1px solid #8886;border-radius:18px;padding:7px 10px;background:transparent;color:var(--ink);font-size:12px}.themechoices button.active{border-color:var(--accent);background:var(--accent);color:#142015}
+#toast{position:absolute;left:50%;bottom:105px;transform:translateX(-50%);padding:8px 13px;background:#111d;color:white;border-radius:20px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:8}#toast.show{opacity:1}
+.hidden-ui .top,.hidden-ui .bottom{transform:translateY(-110%);opacity:0;pointer-events:none}.hidden-ui .bottom{transform:translateY(110%)}.top,.bottom{transition:transform .2s,opacity .2s}
+#error{color:#b64b43;text-align:center;padding:20px;max-width:480px}
+@media(min-width:700px){.stage{padding:24px}.top{padding:0 22px}.bottom{padding-left:22px;padding-right:22px}#pageWrap{border-radius:3px;overflow:hidden}}
+</style>
 </head>
 <body>
-  <p>বইয়ের PDF খোলা হচ্ছে…</p>
-  <script>
-    const API = "https://bengali-book-ai-api.bengalibookai.workers.dev";
-    const id = new URLSearchParams(location.search).get("id");
-    if (id) {
-      location.replace(API + "/api/books/" + encodeURIComponent(id) + "/file");
-    } else {
-      location.replace("library.html");
-    }
-  </script>
+<div id="app">
+<header class="top" id="topbar">
+<button class="iconbtn" id="back" aria-label="লাইব্রেরিতে ফিরুন">‹</button>
+<div class="booktitle"><strong id="title">বই খুলছে…</strong><small>BENGALI BOOK AI READER</small></div>
+<div class="tools">
+<button class="iconbtn" id="zoomOut" aria-label="ছোট করুন">−</button>
+<button class="iconbtn" id="zoomIn" aria-label="বড় করুন">＋</button>
+<button class="iconbtn" id="settingsBtn" aria-label="Reading settings">☼</button>
+<button class="iconbtn" id="fullscreen" aria-label="Fullscreen">⛶</button>
+</div>
+</header>
+<aside class="settings" id="settings">
+<h3>পড়ার সেটিংস</h3>
+<div class="settingrow"><span>Reading theme</span><div class="themechoices"><button data-theme="dark" class="active">Dark</button><button data-theme="sepia">Sepia</button><button data-theme="light">Light</button></div></div>
+<div class="settingrow"><span>পৃষ্ঠা ফিট</span><button class="pill" id="fitWidth">Fit width</button></div>
+<div class="settingrow"><span>স্ক্রিন</span><button class="pill" id="keepAwake">Toolbar hide</button></div>
+</aside>
+<main class="stage" id="stage">
+<div id="pageWrap"><canvas id="pdfCanvas"></canvas><div class="loading" id="loading">PDF প্রস্তুত হচ্ছে…</div></div>
+<div id="error" hidden></div>
+</main>
+<footer class="bottom" id="bottombar">
+<div class="progressrow"><span id="currentPage">1</span><input id="progress" type="range" min="1" max="1" value="1"><span id="totalPages">—</span></div>
+<div class="navrow"><button id="prev">← আগের পৃষ্ঠা</button><span id="pageLabel">পৃষ্ঠা ১</span><button id="next">পরের পৃষ্ঠা →</button></div>
+</footer>
+<div id="toast"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(function(){
+"use strict";
+const API="https://bengali-book-ai-api.bengalibookai.workers.dev";
+const id=new URLSearchParams(location.search).get("id");
+const $=s=>document.querySelector(s);
+const canvas=$("#pdfCanvas"),ctx=canvas.getContext("2d");
+let pdf=null,page=1,scale=1,baseScale=1,renderTask=null,renderToken=0,hideTimer=null;
+const storeKey="bbai-reader-"+(id||"unknown");
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1500)}
+function bn(n){return Number(n).toLocaleString("bn-BD")}
+function updateProgress(){if(!pdf)return;$("#currentPage").textContent=bn(page);$("#totalPages").textContent=bn(pdf.numPages);$("#progress").max=pdf.numPages;$("#progress").value=page;$("#pageLabel").textContent="পৃষ্ঠা "+bn(page)+" / "+bn(pdf.numPages);$("#prev").disabled=page<=1;$("#next").disabled=page>=pdf.numPages}
+async function render(){
+ if(!pdf)return;
+ const token=++renderToken;
+ if(renderTask){try{renderTask.cancel()}catch(e){}}
+ const p=await pdf.getPage(page);
+ if(token!==renderToken)return;
+ const stage=$("#stage");
+ const available=Math.max(260,stage.clientWidth-22);
+ const viewport0=p.getViewport({scale:1});
+ baseScale=available/viewport0.width;
+ const actual= Math.max(.45,Math.min(3.2,baseScale*scale));
+ const viewport=p.getViewport({scale:actual});
+ const dpr=Math.min(window.devicePixelRatio||1,2);
+ canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
+ canvas.style.width=Math.floor(viewport.width)+"px";canvas.style.height=Math.floor(viewport.height)+"px";
+ $("#pageWrap").style.width=Math.floor(viewport.width)+"px";
+ $("#pageWrap").style.height=Math.floor(viewport.height)+"px";
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ renderTask=p.render({canvasContext:ctx,viewport});
+ try{await renderTask.promise;if(token!==renderToken)return;$("#loading").hidden=true;updateProgress();localStorage.setItem(storeKey,String(page))}
+ catch(e){if(e&&e.name!=="RenderingCancelledException")showError("পৃষ্ঠা দেখানো যায়নি: "+e.message)}
+}
+function showError(msg){$("#loading").hidden=true;$("#pageWrap").hidden=true;$("#error").hidden=false;$("#error").textContent=msg}
+function go(n){if(!pdf)return;page=Math.max(1,Math.min(pdf.numPages,n));$("#loading").hidden=false;render()}
+async function start(){
+ if(!id){location.replace("library.html");return}
+ if(!window.pdfjsLib){showError("PDF Reader লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার খুলুন।");return}
+ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+ try{
+  const books=await fetch(API+"/api/books").then(r=>r.json());
+  const book=books.books?.find(b=>b.id===id);
+  if(!book)throw new Error("বইটি পাওয়া যায়নি বা প্রকাশিত নেই।");
+  $("#title").textContent=book.title||"বই পড়ুন";
+  const task=pdfjsLib.getDocument({url:API+"/api/books/"+encodeURIComponent(id)+"/file",disableRange:true});
+  pdf=await task.promise;
+  page=Math.min(pdf.numPages,Math.max(1,Number(localStorage.getItem(storeKey))||1));
+  $("#loading").textContent="বইয়ের পৃষ্ঠা প্রস্তুত হচ্ছে…";
+  updateProgress();await render();
+ }catch(e){showError("বই খোলা যায়নি: "+(e.message||"PDF load error"))}
+}
+$("#back").onclick=()=>location.href="library.html";
+$("#prev").onclick=()=>go(page-1);$("#next").onclick=()=>go(page+1);
+$("#progress").oninput=e=>{page=Number(e.target.value);$("#pageLabel").textContent="পৃষ্ঠা "+bn(page);};
+$("#progress").onchange=e=>go(Number(e.target.value));
+$("#zoomIn").onclick=()=>{scale=Math.min(3.2,scale+.15);render()};
+$("#zoomOut").onclick=()=>{scale=Math.max(.55,scale-.15);render()};
+$("#settingsBtn").onclick=()=>$("#settings").classList.toggle("open");
+document.querySelectorAll("[data-theme]").forEach(b=>b.onclick=()=>{document.body.classList.remove("sepia","light");if(b.dataset.theme!=="dark")document.body.classList.add(b.dataset.theme);document.querySelectorAll("[data-theme]").forEach(x=>x.classList.toggle("active",x===b));localStorage.setItem("bbai-reader-theme",b.dataset.theme)});
+const savedTheme=localStorage.getItem("bbai-reader-theme")||"dark";if(savedTheme!=="dark")document.body.classList.add(savedTheme);document.querySelectorAll("[data-theme]").forEach(b=>b.classList.toggle("active",b.dataset.theme===savedTheme));
+$("#fitWidth").onclick=()=>{scale=1;render();$("#settings").classList.remove("open")};
+$("#keepAwake").onclick=()=>{document.body.classList.toggle("hidden-ui");$("#settings").classList.remove("open")};
+$("#fullscreen").onclick=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.()};
+$("#stage").addEventListener("click",e=>{if(e.target===canvas||e.target===$("#pageWrap"))document.body.classList.toggle("hidden-ui")});
+document.addEventListener("keydown",e=>{if(e.key==="ArrowRight"||e.key==="PageDown")go(page+1);if(e.key==="ArrowLeft"||e.key==="PageUp")go(page-1);if(e.key==="Escape")$("#settings").classList.remove("open")});
+let touchX=0;$("#stage").addEventListener("touchstart",e=>{touchX=e.changedTouches[0].screenX},{passive:true});$("#stage").addEventListener("touchend",e=>{const dx=e.changedTouches[0].screenX-touchX;if(Math.abs(dx)>65){go(page+(dx<0?1:-1))}},{passive:true});
+window.addEventListener("resize",()=>{if(pdf)render()});
+start();
+})();
+</script>
 </body>
 </html>
