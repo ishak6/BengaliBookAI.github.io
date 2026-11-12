@@ -14,6 +14,29 @@ The repository includes a Node.js built-in test suite at `worker/test/harness.te
 
 Both Worker and Pages deployment workflows execute this suite before deployment. A failed test prevents that workflow from publishing. These checks are deterministic regression tests, not a claim that the AI is factually correct on every possible question. Real OCR accuracy and answer quality still require a curated benchmark set with human-verified expected answers.
 
+## Bengali AI Benchmark (50 questions)
+
+A curated Bengali benchmark lives at `worker/benchmark/bengali-general-50.json`. It contains 50 fixed-answer questions across science, Bangladesh, mathematics, computer fundamentals and general knowledge. Each question has a reference answer and a fact-based rubric with acceptable alternatives.
+
+The deterministic scorer is in `worker/src/benchmark.js`; the live runner is `worker/scripts/run-benchmark.js`. CI validates the dataset and tests the scorer without making paid AI calls.
+
+From the repository root, using Node.js 22:
+
+```bash
+npm test --prefix worker
+node worker/scripts/run-benchmark.js
+```
+
+The second command validates the dataset and shows the planned run size only. To query the live general-AI endpoint, explicitly run:
+
+```bash
+node worker/scripts/run-benchmark.js --run
+```
+
+Optional controls: `--limit 10`, `--delay-ms 1500`, and `--api-url https://your-worker.example.workers.dev`. The live run makes one AI request per selected question and may consume provider quota/credits. Reports are written locally under `worker/benchmark/results/`; they are not uploaded automatically.
+
+Scoring uses required fact groups: each group is met when at least one accepted phrase appears in the answer. The report provides question pass rate, fact coverage, category breakdown and response latency. This is a transparent lexical baseline, not a semantic judge: paraphrases may be under-scored, and keyword matches can occasionally over-score. Review failed answers manually before drawing conclusions. The benchmark tests general knowledge only; it does not measure book-grounded retrieval, OCR quality, source citation accuracy or long-form reasoning. Do not treat the score as a guarantee of factual correctness.
+
 ## Add an authorized book
 
 Only add public-domain books, open-license books, or books for which you have explicit written distribution permission. GitHub Release assets are public.
