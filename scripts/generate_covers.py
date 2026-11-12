@@ -57,7 +57,14 @@ def upload_cover(pdf_bytes, pdf_url):
         raise RuntimeError("GITHUB_TOKEN is missing; cover upload needs contents:write permission")
     tag = release_tag(pdf_url)
     api = f"https://api.github.com/repos/{REPO}"
-    release = github_request(api + "/releases/tags/" + urllib.parse.quote(tag, safe=""))
+    try:
+        release = github_request(api + "/releases/tags/" + urllib.parse.quote(tag, safe=""))
+    except RuntimeError as error:
+        if "HTTP 404" not in str(error):
+            raise
+        print(f"Release metadata missing for {tag}; creating the release record")
+        payload = json.dumps({"tag_name": tag, "name": "Bengali Book AI cover — " + tag, "draft": False, "prerelease": False}).encode("utf-8")
+        release = github_request(api + "/releases", method="POST", data=payload)
     asset = next((x for x in release.get("assets", []) if x.get("name") == "cover.jpg"), None)
     if asset:
         github_request(api + "/releases/assets/" + str(asset["id"]), method="DELETE")
@@ -100,6 +107,7 @@ def main():
             print("Skipping book without PDF URL:", book.get("id", "unknown"))
             continue
         print("Generating cover:", book.get("title", book.get("id", "book")))
+        print("PDF source:", pdf_url)
         download = urllib.request.Request(pdf_url, headers={"User-Agent": "BengaliBookAI-Cover-Backfill/1.0"})
         with urllib.request.urlopen(download, timeout=180) as response:
             pdf_bytes = response.read(80 * 1024 * 1024 + 1)
