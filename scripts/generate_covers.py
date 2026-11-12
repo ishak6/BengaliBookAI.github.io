@@ -48,7 +48,7 @@ def release_tag(pdf_url):
     parts = u.path.split("/")
     try:
         index = parts.index("download")
-        return parts[index + 1]
+        return urllib.parse.unquote(parts[index + 1])
     except (ValueError, IndexError):
         raise RuntimeError("Could not determine GitHub Release tag")
 
