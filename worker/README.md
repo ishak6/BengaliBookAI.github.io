@@ -14,13 +14,13 @@ Only add public-domain books, open-license books, or books for which you have ex
 
 1. Open [GitHub Releases](https://github.com/ishak6/BengaliBookAI.github.io/releases) and create a release.
 2. Attach the permitted PDF and publish the release. Copy the asset URL ending in `.pdf`.
-3. Add the admin token as GitHub repository Actions secret `WORKER_ADMIN_API_TOKEN`, and the OpenRouter key as `OPENROUTER_API_KEY`.
+3. Set GitHub repository Actions secrets `WORKER_ADMIN_API_TOKEN` (internal indexer credential, at least 32 characters), `WORKER_ADMIN_PASSWORD` (your Admin login password, at least 12 characters), and `OPENROUTER_API_KEY`. Do not share these values. The website no longer asks you to enter the internal API token.
 4. Create a fine-grained GitHub token restricted to this repository with **Contents: Read and write** and **Actions: Read and write**. Save it as repository secret `BOOK_UPLOAD_TOKEN` (GitHub reserves names beginning with `GITHUB_`). Never paste any token into chat or commit it.
-5. Open [Admin panel](https://ishak6.github.io/BengaliBookAI.github.io/admin.html), enter the admin token, choose a permitted PDF, and confirm that you have distribution rights. Upload. The service creates a public GitHub Release asset and queues PDF indexing automatically.
-6. Open GitHub → Actions → **Sync Worker Secrets** → Run workflow. This copies `WORKER_ADMIN_API_TOKEN` to Worker secret `ADMIN_API_TOKEN`, `OPENROUTER_API_KEY` to `AI_API_KEY`, and `BOOK_UPLOAD_TOKEN` to Worker secret `GITHUB_API_TOKEN`. The workflow also needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+5. Open [Admin panel](https://ishak6.github.io/BengaliBookAI.github.io/admin.html), sign in with the Admin password, choose a permitted PDF, and confirm that you have distribution rights. Upload. The service creates a public GitHub Release asset and queues PDF indexing automatically. The panel keeps only an 8-hour session in sessionStorage; it does not expose the internal API token.
+6. Open GitHub → Actions → **Sync Worker Secrets** → Run workflow. This copies `WORKER_ADMIN_API_TOKEN` to Worker secret `ADMIN_API_TOKEN`, `WORKER_ADMIN_PASSWORD` to Worker secret `ADMIN_PASSWORD`, `OPENROUTER_API_KEY` to `AI_API_KEY`, and `BOOK_UPLOAD_TOKEN` to Worker secret `GITHUB_API_TOKEN`. The workflow also needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 7. If the upload was attempted before the token sync, retry the PDF upload after the sync completes. After indexing succeeds, the book is automatically published and appears in `/api/books`.
 
-The admin panel does not store the token in localStorage or cookies; it stays in the page's memory and is sent over HTTPS. Clear the field and close the tab after use.
+Admin login creates a signed, 8-hour session. The Admin password is never stored in the browser. Logout clears the session from sessionStorage.
 
 ## AI provider
 
@@ -32,7 +32,9 @@ Optional non-secret variables:
 
 ## API routes
 
-- `GET /health` — Worker, D1, admin, AI and Telegram configuration flags (never secret values).
+- `GET /health` — Worker, D1, admin login, GitHub upload, AI and Telegram configuration flags (never secret values).
+- `POST /api/admin/login` — verify Admin password and issue an 8-hour signed session.
+- `GET /api/admin/session` — validate the current Admin session.
 - `GET /api/books` — list ready books.
 - `GET /api/books/:id/file` — stream a public GitHub Release PDF.
 - `POST /api/ask` — Bengali FTS5 retrieval and optional AI answer with page references.
@@ -51,7 +53,7 @@ The indexing workflow extracts selectable PDF text and falls back to Bengali+Eng
 2. Apply the existing D1 migration if it has not already been applied:
    `npx wrangler d1 migrations apply bengali-book-ai-db --remote`.
 3. Deploy with GitHub Actions **Deploy Bengali Book AI Worker**. Required GitHub secrets: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-4. Add Worker secrets `ADMIN_API_TOKEN` and `AI_API_KEY` in Cloudflare. Optional Telegram secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_ID`.
+4. Add Worker secrets `ADMIN_API_TOKEN`, `ADMIN_PASSWORD`, `GITHUB_API_TOKEN` and `AI_API_KEY` in Cloudflare, or use the Sync Worker Secrets workflow. Optional Telegram secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_ID`.
 
 Never paste any secret into chat, source files, commit messages or screenshots.
 
