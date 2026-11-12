@@ -199,3 +199,19 @@ test("PDF proxy forwards byte ranges and preserves partial response headers", as
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("library renders stored cover images without downloading and parsing every PDF in the browser", async () => {
+  const html = await readFile(new URL("../../library.html", import.meta.url), "utf8");
+  assert.match(html, /book\.cover_url/);
+  assert.match(html, /loading="lazy"/);
+  assert.equal(html.includes("pdfjsLib.getDocument"), false);
+});
+
+test("reader keeps PDF.js streaming enabled and starts at the cover page", async () => {
+  const html = await readFile(new URL("../../reader.html", import.meta.url), "utf8");
+  assert.match(html, /disableStream:false/);
+  assert.match(html, /disableAutoFetch:false/);
+  assert.match(html, /page=1;/);
+  assert.match(html, /ব্রাউজারে PDF খুলুন/);
+});
