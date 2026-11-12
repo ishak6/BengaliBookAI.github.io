@@ -1,0 +1,46 @@
+name: Bengali Book AI Quality Harness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bengali-book-ai-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: AI and application regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate Worker JavaScript
+        run: node --check worker/src/index.js
+
+      - name: Run deterministic AI quality tests
+        run: npm test --prefix worker
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate PDF scanner syntax
+        run: python -m py_compile scripts/index_pdf.py
+
+      - name: Report quality gate
+        if: success()
+        run: echo "PASS — all deterministic quality checks completed."
