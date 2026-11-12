@@ -8,7 +8,36 @@ async function createBook(r,e){if(!admin(r,e))return json({error:"Unauthorized"}
 const id=bookId(b.id||b.title),title=String(b.title||"").trim(),rights=String(b.rights_type||""),note=String(b.rights_note||"").trim(),url=String(b.storage_url||"").trim();
 if(!id||!title||title.length>240||!["public_domain","open_license","permission_granted"].includes(rights)||!note||!releaseUrl(url))return json({error:"title, rights_type, rights_note and valid PDF release URL are required"},400);
 try{await e.DB.prepare("INSERT INTO books(id,title,author,language,source_url,rights_type,rights_note,storage_key,status) VALUES(?,?,?,'bn',?,?,?,?,'processing')").bind(id,title,String(b.author||"").slice(0,200)||null,String(b.source_url||"").slice(0,1000)||null,rights,note.slice(0,1000),url).run();return json({ok:true,book:{id,title,status:"processing"}} ,201)}catch(err){return json({error:String(err).includes("UNIQUE")?"Book ID already exists":"Could not register book"},409)}}
-async function addPages(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
+
+async function uploadPdf(r,e){
+ if(!admin(r,e))return json({error:"Unauthorized"},401);
+ if(!e.GITHUB_API_TOKEN)return json({error:"Upload service is not configured. Admin must add GITHUB_API_TOKEN and sync Worker secrets once."},503);
+ let form;try{form=await r.formData()}catch{return json({error:"Invalid multipart upload"},400)}
+ const file=form.get("pdf");
+ if(!(file instanceof File)||!file.name.toLowerCase().endsWith(".pdf"))return json({error:"একটি PDF ফাইল নির্বাচন করুন"},400);
+ if(file.size<8||file.size>80*1024*1024)return json({error:"PDF must be between 8 bytes and 80 MiB"},413);
+ if(form.get("rights_confirmed")!=="yes")return json({error:"বই ব্যবহারের অধিকার নিশ্চিত করুন"},400);
+ const bytes=await file.arrayBuffer();const head=new TextDecoder().decode(bytes.slice(0,5));if(head!=="%PDF-")return json({error:"Invalid PDF file"},400);
+ const title=file.name.replace(/\\.pdf$/i,"").replace(/[_-]+/g," ").trim().slice(0,240)||"Uploaded Bengali book";
+ const id=(bookId(title)||"book")+"-"+crypto.randomUUID().slice(0,8);
+ const api="https://api.github.com/repos/ishak6/BengaliBookAI.github.io";
+ const ghHeaders={"authorization":"Bearer "+e.GITHUB_API_TOKEN,"accept":"application/vnd.github+json","x-github-api-version":"2022-11-28","user-agent":"BengaliBookAI"};
+ const tag="book-"+id;
+ let release;
+ try{
+  const cr=await fetch(api+"/releases",{method:"POST",headers:{...ghHeaders,"content-type":"application/json"},body:JSON.stringify({tag_name:tag,name:title+" — Bengali Book AI",draft:false,prerelease:false})});
+  const cd=await cr.json();if(!cr.ok)throw new Error(cd.message||"Could not create GitHub Release");release=cd;
+  const uploadUrl=String(release.upload_url||"").replace(/\\{\\?name,label\\}$/,"")+"?name="+encodeURIComponent(file.name);
+  const up=await fetch(uploadUrl,{method:"POST",headers:{...ghHeaders,"content-type":"application/pdf"},body:bytes});
+  const ud=await up.json();if(!up.ok)throw new Error(ud.message||"Could not upload PDF asset");
+  const assetUrl=ud.browser_download_url;
+  await e.DB.prepare("INSERT INTO books(id,title,author,language,source_url,rights_type,rights_note,storage_key,status) VALUES(?,?,NULL,'bn',NULL,'permission_granted',?,?, 'processing')").bind(id,title,"Admin upload attestation: public-domain, open-license, or explicit permission confirmed.",assetUrl).run();
+  const dispatch=await fetch(api+"/actions/workflows/index-pdf.yml/dispatches",{method:"POST",headers:{...ghHeaders,"content-type":"application/json"},body:JSON.stringify({ref:"main",inputs:{book_id:id,release_url:assetUrl}})});
+  if(!dispatch.ok){const d=await dispatch.text();throw new Error("PDF uploaded but indexing workflow could not start: "+d.slice(0,300))}
+  return json({ok:true,book:{id,title,status:"processing"},message:"PDF uploaded and indexing workflow dispatched."},202);
+ }catch(err){console.error("PDF upload pipeline failed",err);return json({error:"Upload pipeline failed: "+String(err.message||err).slice(0,300)},502)}
+}
+\nasync function addPages(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
 const exists=await e.DB.prepare("SELECT id FROM books WHERE id=?").bind(id).first();if(!exists)return json({error:"Book not found"},404);
 const q=[];for(const p of b.pages){const n=Number(p.page_number),c=String(p.content||"").trim();if(!Number.isInteger(n)||n<1||!c||c.length>18000)return json({error:"Invalid page number or content length"},400);q.push(e.DB.prepare("INSERT INTO book_pages(book_id,page_number,chapter,content) VALUES(?,?,?,?) ON CONFLICT(book_id,page_number) DO UPDATE SET chapter=excluded.chapter,content=excluded.content").bind(id,n,String(p.chapter||"").slice(0,240)||null,c))}
 try{await e.DB.batch(q);return json({ok:true,book_id:id,received_pages:q.length})}catch(err){console.error(err);return json({error:"Page batch failed"},503)}}
@@ -21,7 +50,7 @@ let ai=null;if(e.AI_API_KEY){try{const base=String(e.AI_BASE_URL||"https://api.o
 return json({ok:true,found:true,book_answer:String(ai?.book_answer||"প্রাসঙ্গিক বইয়ের অংশ পাওয়া গেছে। নিচের পৃষ্ঠা-সূত্র যাচাই করুন।"),general_explanation:ai?.general_explanation||null,ai_configured:Boolean(e.AI_API_KEY),ai_generated:Boolean(ai?.book_answer||ai?.general_explanation),sources:rows.map((x,i)=>({source_id:`S${i+1}`,book_id:x.book_id,title:x.title,author:x.author,page_number:x.page_number,chapter:x.chapter,excerpt:x.content.slice(0,1200)}))})}
 async function telegram(r,e){if(!e.TELEGRAM_WEBHOOK_SECRET)return json({error:"Webhook secret missing"},503);if(r.headers.get("X-Telegram-Bot-Api-Secret-Token")!==e.TELEGRAM_WEBHOOK_SECRET)return json({error:"Unauthorized"},401);let u;try{u=await r.json()}catch{return json({error:"Invalid JSON"},400)}const m=u.message;if(!m?.chat?.id||typeof m.text!=="string")return json({ok:true,ignored:true});const t=m.text.trim(),id=m.chat.id;let msg="Bengali Book AI: ওয়েবসাইটে বই অনুসন্ধান করুন।";if(t==="/start")msg="স্বাগতম Bengali Book AI-তে। /books দিয়ে বইয়ের তালিকা দেখুন।";else if(t==="/help")msg="/start — শুরু, /books — বইয়ের তালিকা, /help — সাহায্য";else if(t==="/books"){const x=await e.DB.prepare("SELECT title,author FROM books WHERE status='ready' LIMIT 30").all();msg=(x.results||[]).map((v,i)=>`${i+1}. ${v.title}`).join("\n")||"এখনো বই যোগ করা হয়নি।"}else if(t==="/admin")msg=String(m.from?.id)===String(e.ADMIN_TELEGRAM_ID)&&e.ADMIN_TELEGRAM_ID?"Admin যাচাই হয়েছে।":"অনুমতি নেই।";try{await fetch(`https://api.telegram.org/bot${e.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({chat_id:id,text:msg})})}catch{return json({error:"Telegram send failed"},502)}return json({ok:true})}
 export default {async fetch(r,e){const u=new URL(r.url);if(r.method==="OPTIONS")return new Response(null,{status:204,headers:H});if(r.method==="GET"&&u.pathname==="/health")return json({ok:true,service:"Bengali Book AI API",phase:2,storage:"github-releases",databaseConfigured:Boolean(e.DB),adminConfigured:Boolean(e.ADMIN_API_TOKEN),aiConfigured:Boolean(e.AI_API_KEY),telegramConfigured:Boolean(e.TELEGRAM_BOT_TOKEN)});
-if(r.method==="GET"&&u.pathname==="/api/books")return books(e);if(r.method==="POST"&&u.pathname==="/api/ask")return ask(r,e);if(r.method==="POST"&&u.pathname==="/api/admin/books")return createBook(r,e);
+if(r.method==="GET"&&u.pathname==="/api/books")return books(e);if(r.method==="POST"&&u.pathname==="/api/ask")return ask(r,e);if(r.method==="POST"&&u.pathname==="/api/admin/books")return createBook(r,e);if(r.method==="POST"&&u.pathname==="/api/admin/upload")return uploadPdf(r,e);
 const p=u.pathname.match(/^\/api\/admin\/books\/([^/]+)\/pages$/);if(r.method==="POST"&&p)return addPages(r,e,decodeURIComponent(p[1]));
 const c=u.pathname.match(/^\/api\/admin\/books\/([^/]+)\/complete$/);if(r.method==="POST"&&c)return completeBook(r,e,decodeURIComponent(c[1]));
 const f=u.pathname.match(/^\/api\/books\/([^/]+)\/file$/);if(r.method==="GET"&&f){const b=await e.DB.prepare("SELECT storage_key FROM books WHERE id=? AND status='ready'").bind(decodeURIComponent(f[1])).first();if(!b||!releaseUrl(b.storage_key))return json({error:"Book file not found"},404);const x=await fetch(b.storage_key);if(!x.ok)return json({error:"Release asset unavailable"},502);return new Response(x.body,{headers:{"content-type":"application/pdf","cache-control":"public,max-age=3600","access-control-allow-origin":"*","x-content-type-options":"nosniff"}})}
