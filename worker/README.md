@@ -8,6 +8,12 @@
 - Public GitHub Release assets store permitted PDF files (no R2 payment card required).
 - GitHub Actions downloads a selected release PDF, extracts text with PyMuPDF, uses Bengali+English Tesseract OCR for scanned/low-text pages, and sends page batches to the Worker.
 
+## Engineering Quality Harness
+
+The repository includes a Node.js built-in test suite at `worker/test/harness.test.js` (no third-party test dependency). Run it with `npm test --prefix worker` using Node.js 22. It covers API validation, CORS, image MIME/size limits, missing AI configuration, mocked two-stage image OCR and answer generation, book-only no-evidence behavior, frontend camera/upload wiring, and the ready-book retrieval constraint. AI calls are mocked in tests; no production key or real book data is needed.
+
+Both Worker and Pages deployment workflows execute this suite before deployment. A failed test prevents that workflow from publishing. These checks are deterministic regression tests, not a claim that the AI is factually correct on every possible question. Real OCR accuracy and answer quality still require a curated benchmark set with human-verified expected answers.
+
 ## Add an authorized book
 
 Only add public-domain books, open-license books, or books for which you have explicit written distribution permission. GitHub Release assets are public.
