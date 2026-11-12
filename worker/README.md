@@ -14,11 +14,12 @@ Only add public-domain books, open-license books, or books for which you have ex
 
 1. Open [GitHub Releases](https://github.com/ishak6/BengaliBookAI.github.io/releases) and create a release.
 2. Attach the permitted PDF and publish the release. Copy the asset URL ending in `.pdf`.
-3. In Cloudflare → Workers & Pages → `bengali-book-ai-api` → Settings → Variables and Secrets, add secret `ADMIN_API_TOKEN`. Use a unique random value of at least 32 characters. Never commit or share it.
-4. Add the exact same value as a GitHub repository Actions secret named `WORKER_ADMIN_API_TOKEN`.
+3. Open the Admin panel and use **নিরাপদ token তৈরি**. Copy the generated token. Add it as GitHub repository Actions secret `WORKER_ADMIN_API_TOKEN`. Never commit or share it.
+4. Add your OpenRouter API key as GitHub repository Actions secret `OPENROUTER_API_KEY`.
 5. Open [Admin panel](https://ishak6.github.io/BengaliBookAI.github.io/admin.html). Enter the token, book title, rights evidence and PDF asset URL. Submit.
 6. The panel returns a Book ID. Open GitHub → Actions → **Index PDF into D1** → Run workflow. Enter that Book ID and the same PDF URL.
-7. When the workflow succeeds, check `/api/books`. The book should appear with status ready.
+7. Before registering a book, open GitHub → Actions → **Sync Worker Secrets** → Run workflow. This copies `WORKER_ADMIN_API_TOKEN` to Worker secret `ADMIN_API_TOKEN` and `OPENROUTER_API_KEY` to Worker secret `AI_API_KEY`; values are not printed. The sync workflow also needs the existing `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
+8. When the indexing workflow succeeds, check `/api/books`. The book should appear with status ready.
 
 The admin panel does not store the token in localStorage or cookies; it stays in the page's memory and is sent over HTTPS. Clear the field and close the tab after use.
 
