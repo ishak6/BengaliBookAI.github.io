@@ -41,6 +41,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Run Bengali OCR quality tests
+        run: python -m unittest discover -s scripts -p 'test_ocr_quality.py' -v
+
       - name: Validate PDF scanner syntax
         run: python -m py_compile scripts/index_pdf.py
 
