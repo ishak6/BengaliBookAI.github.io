@@ -45,7 +45,7 @@ jobs:
         run: python -m unittest discover -s scripts -p 'test_ocr_quality.py' -v
 
       - name: Validate PDF scanner syntax
-        run: python -m py_compile scripts/index_pdf.py
+        run: python -m py_compile scripts/index_pdf.py scripts/generate_covers.py
 
       - name: Report quality gate
         if: success()
