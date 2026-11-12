@@ -1,1 +1,72 @@
-<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10251f"><title>বইয়ের লাইব্রেরি · Bengali Book AI</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f7f2;color:#182820;font-family:system-ui,"Noto Sans Bengali",sans-serif}header{background:#10251f;color:white;padding:18px max(18px,calc((100% - 1000px)/2));display:flex;justify-content:space-between;align-items:center}a{color:#176b4b}header a{color:#d8eee2;text-decoration:none}.wrap{max-width:1000px;margin:auto;padding:30px 18px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}.book{display:block;background:white;border:1px solid #dce6dd;border-radius:15px;padding:18px;color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}.book:hover,.book:focus-visible{border-color:#176b4b;transform:translateY(-2px);outline:none}.book h3{margin:0 0 8px}.muted{color:#65746c;font-size:14px}.empty{padding:30px;text-align:center;background:white;border-radius:14px;color:#64736d}</style></head><body><header><strong>📚 Bengali Book AI</strong><nav><a href="index.html">প্রশ্ন করুন</a></nav></header><main class="wrap"><h1>বইয়ের লাইব্রেরি</h1><p class="muted">প্রকাশিত ও অনুমতিপ্রাপ্ত বইগুলো এখানে পড়তে পারবেন।</p><div id="status" class="muted">বইয়ের তালিকা লোড হচ্ছে…</div><section id="books" class="grid"></section></main><script>const API="https://bengali-book-ai-api.bengalibookai.workers.dev";async function load(){const host=document.getElementById("books"),s=document.getElementById("status");try{const r=await fetch(API+"/api/books");const d=await r.json();if(!r.ok)throw new Error(d.error||"API error");host.replaceChildren();if(!d.books?.length){s.textContent="এখনো কোনো বই প্রকাশিত হয়নি।";return}s.textContent=d.books.length+"টি বই পাওয়া গেছে।";for(const b of d.books){const a=document.createElement("a");a.className="book";a.href="reader.html?id="+encodeURIComponent(b.id);a.setAttribute("aria-label",b.title+" — PDF বই খুলুন");const h=document.createElement("h3");h.textContent=b.title;const p=document.createElement("p");p.className="muted";p.textContent=b.author||"লেখক উল্লেখ নেই";a.append(h,p);host.append(a)}}catch(e){s.textContent="বইয়ের তালিকা পাওয়া যায়নি: "+e.message}}load();</script></body></html>
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10251f">
+<title>বইয়ের লাইব্রেরি · Bengali Book AI</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f7f2;color:#182820;font-family:system-ui,"Noto Sans Bengali",sans-serif}
+header{background:#10251f;color:white;padding:18px max(18px,calc((100% - 1000px)/2));display:flex;justify-content:space-between;align-items:center}
+a{color:#176b4b}header a{color:#d8eee2;text-decoration:none}
+.wrap{max-width:1000px;margin:auto;padding:30px 18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.book{display:block;overflow:hidden;background:white;border:1px solid #dce6dd;border-radius:15px;color:inherit;text-decoration:none;transition:border-color .15s,transform .15s;box-shadow:0 3px 12px #10251f0a}
+.book:hover,.book:focus-visible{border-color:#176b4b;transform:translateY(-2px);outline:none}
+.cover{height:230px;background:linear-gradient(145deg,#dce9dc,#b9cfbf);display:grid;place-items:center;overflow:hidden}
+.cover canvas{display:block;width:100%;height:100%;object-fit:contain;background:#f4f0e7}
+.coverPlaceholder{font-size:54px;opacity:.65}
+.bookinfo{padding:14px 16px 16px}.book h3{margin:0 0 7px;font-size:16px}.muted{color:#65746c;font-size:14px}
+.empty{padding:30px;text-align:center;background:white;border-radius:14px;color:#64736d}
+</style>
+</head>
+<body>
+<header><strong>📚 Bengali Book AI</strong><nav><a href="index.html">প্রশ্ন করুন</a></nav></header>
+<main class="wrap"><h1>বইয়ের লাইব্রেরি</h1><p class="muted">প্রকাশিত ও অনুমতিপ্রাপ্ত বইগুলো এখানে পড়তে পারবেন। বইয়ের PDF-এর প্রথম পৃষ্ঠা থেকে প্রচ্ছদ দেখানো হবে।</p><div id="status" class="muted">বইয়ের তালিকা লোড হচ্ছে…</div><section id="books" class="grid"></section></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+"use strict";
+const API="https://bengali-book-ai-api.bengalibookai.workers.dev";
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const started=new WeakSet();
+async function renderCover(book,host){
+ if(started.has(host)||!window.pdfjsLib)return;started.add(host);
+ let pdf;
+ try{
+  const task=pdfjsLib.getDocument({url:API+"/api/books/"+encodeURIComponent(book.id)+"/file",rangeChunkSize:65536,disableRange:false,disableStream:true,disableAutoFetch:true});
+  pdf=await task.promise;
+  const page=await pdf.getPage(1),base=page.getViewport({scale:1}),scale=Math.min(280/base.width,1.2),viewport=page.getViewport({scale});
+  const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d");
+  canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+  canvas.style.width="100%";canvas.style.height="100%";
+  host.replaceChildren(canvas);
+  await page.render({canvasContext:ctx,viewport}).promise;
+ }catch(e){host.innerHTML='<div class="coverPlaceholder" aria-label="প্রচ্ছদ পাওয়া যায়নি">📖</div>'}
+ finally{if(pdf)try{await pdf.destroy()}catch(e){}}
+}
+async function load(){
+ const host=document.getElementById("books"),status=document.getElementById("status");
+ try{
+  const r=await fetch(API+"/api/books");const d=await r.json();
+  if(!r.ok)throw new Error(d.error||"API error");
+  host.replaceChildren();
+  if(!d.books?.length){status.textContent="এখনো কোনো বই প্রকাশিত হয়নি।";return}
+  status.textContent=d.books.length+"টি বই পাওয়া গেছে।";
+  const jobs=[];
+  for(const b of d.books){
+   const a=document.createElement("a");a.className="book";a.href="reader.html?id="+encodeURIComponent(b.id);a.setAttribute("aria-label",b.title+" — PDF বই খুলুন");
+   const cover=document.createElement("div");cover.className="cover";cover.innerHTML='<div class="coverPlaceholder">📖</div>';
+   const info=document.createElement("div");info.className="bookinfo";
+   const h=document.createElement("h3");h.textContent=b.title;
+   const p=document.createElement("p");p.className="muted";p.textContent=b.author||"লেখক উল্লেখ নেই";
+   info.append(h,p);a.append(cover,info);host.append(a);jobs.push({book:b,cover});
+  }
+  if("IntersectionObserver" in window){
+   const observer=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){const item=jobs.find(x=>x.cover===entry.target);if(item){renderCover(item.book,item.cover);observer.unobserve(entry.target)}}},{rootMargin:"240px"});
+   jobs.forEach(x=>observer.observe(x.cover));
+  }else jobs.slice(0,4).forEach(x=>renderCover(x.book,x.cover));
+ }catch(e){status.textContent="বইয়ের তালিকা পাওয়া যায়নি: "+e.message}
+}
+load();
+</script>
+</body>
+</html>
