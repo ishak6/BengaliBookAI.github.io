@@ -11,6 +11,18 @@
 - Cloudflare account resources ও secrets এখনো configure করা হয়নি।
 - PDF ingestion, OCR, Bengali retrieval এবং AI answer generation এখনো তৈরি হয়নি।
 
+## Quality Harness
+
+A permanent automated test harness runs on pushes and pull requests. It checks Worker request validation, image upload limits and MIME handling, multimodal OCR/answer orchestration with mocked provider responses, book-only evidence behavior, frontend camera/upload wiring, JavaScript syntax, and PDF indexer syntax. Worker and Pages deployment workflows run the same harness before publishing. The tests use placeholder credentials and mocked AI responses; they never call the paid AI provider or modify production books.
+
+Run locally with Node.js 22:
+
+```bash
+npm test --prefix worker
+node --check worker/src/index.js
+python -m py_compile scripts/index_pdf.py
+```
+
 ## Architecture
 
 - GitHub Pages — static website.
