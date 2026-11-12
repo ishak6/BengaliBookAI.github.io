@@ -14,12 +14,11 @@ Only add public-domain books, open-license books, or books for which you have ex
 
 1. Open [GitHub Releases](https://github.com/ishak6/BengaliBookAI.github.io/releases) and create a release.
 2. Attach the permitted PDF and publish the release. Copy the asset URL ending in `.pdf`.
-3. Open the Admin panel and use **নিরাপদ token তৈরি**. Copy the generated token. Add it as GitHub repository Actions secret `WORKER_ADMIN_API_TOKEN`. Never commit or share it.
-4. Add your OpenRouter API key as GitHub repository Actions secret `OPENROUTER_API_KEY`.
-5. Open [Admin panel](https://ishak6.github.io/BengaliBookAI.github.io/admin.html). Enter the token, book title, rights evidence and PDF asset URL. Submit.
-6. The panel returns a Book ID. Open GitHub → Actions → **Index PDF into D1** → Run workflow. Enter that Book ID and the same PDF URL.
-7. Before registering a book, open GitHub → Actions → **Sync Worker Secrets** → Run workflow. This copies `WORKER_ADMIN_API_TOKEN` to Worker secret `ADMIN_API_TOKEN` and `OPENROUTER_API_KEY` to Worker secret `AI_API_KEY`; values are not printed. The sync workflow also needs the existing `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets.
-8. When the indexing workflow succeeds, check `/api/books`. The book should appear with status ready.
+3. Add the admin token as GitHub repository Actions secret `WORKER_ADMIN_API_TOKEN`, and the OpenRouter key as `OPENROUTER_API_KEY`.
+4. Create a fine-grained GitHub token restricted to this repository with **Contents: Read and write** and **Actions: Read and write**. Save it as repository secret `BOOK_UPLOAD_TOKEN` (GitHub reserves names beginning with `GITHUB_`). Never paste any token into chat or commit it.
+5. Open [Admin panel](https://ishak6.github.io/BengaliBookAI.github.io/admin.html), enter the admin token, choose a permitted PDF, and confirm that you have distribution rights. Upload. The service creates a public GitHub Release asset and queues PDF indexing automatically.
+6. Open GitHub → Actions → **Sync Worker Secrets** → Run workflow. This copies `WORKER_ADMIN_API_TOKEN` to Worker secret `ADMIN_API_TOKEN`, `OPENROUTER_API_KEY` to `AI_API_KEY`, and `BOOK_UPLOAD_TOKEN` to Worker secret `GITHUB_API_TOKEN`. The workflow also needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+7. If the upload was attempted before the token sync, retry the PDF upload after the sync completes. After indexing succeeds, the book is automatically published and appears in `/api/books`.
 
 The admin panel does not store the token in localStorage or cookies; it stays in the page's memory and is sent over HTTPS. Clear the field and close the tab after use.
 
