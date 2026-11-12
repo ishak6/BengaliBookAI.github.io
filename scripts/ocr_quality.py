@@ -9,7 +9,7 @@ def text_quality(value: str) -> float:
     visible = [ch for ch in text if not ch.isspace()]
     if not visible:
         return 0.0
-    good = sum(unicodedata.category(ch)[0] in ("L", "M", "N", "P", "S") for ch in visible)
+    good = sum(ch != "\\ufffd" and unicodedata.category(ch)[0] in ("L", "M", "N", "P", "S") for ch in visible)
     bengali = sum("\\u0980" <= ch <= "\\u09ff" for ch in visible)
     bad = sum(ch == "\\ufffd" or unicodedata.category(ch) in ("Co", "Cs", "Cn") for ch in visible)
     base = good / len(visible)
