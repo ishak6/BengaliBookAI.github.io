@@ -37,7 +37,7 @@ def cover_jpeg(pdf_bytes):
         rect = page.rect
         scale = min(1000 / max(rect.width, rect.height), 1.5)
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
-        return pix.tobytes("jpeg", jpg_quality=84)
+        return pix.tobytes("jpg", jpg_quality=84)
     finally:
         doc.close()
 
