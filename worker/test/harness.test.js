@@ -144,3 +144,58 @@ test("book retrieval is restricted to ready books", async () => {
   assert.match(source, /async function askImage\(/);
   assert.match(source, /async function ask\(/);
 });
+
+
+test("public book list exposes a persistent cover asset URL without exposing storage internals", async () => {
+  const env = {
+    DB: {
+      prepare() {
+        return { async all() { return { results: [{
+          id: "sample-book", title: "Sample Book", author: "Author", language: "bn",
+          rights_type: "permission_granted", status: "ready",
+          storage_key: "https://github.com/ishak6/BengaliBookAI.github.io/releases/download/book-sample/sample.pdf"
+        }] }; } };
+      }
+    }
+  };
+  const response = await worker.fetch(makeRequest("/api/books"), env);
+  const data = await json(response);
+  assert.equal(response.status, 200);
+  assert.equal(data.books[0].cover_url, "https://github.com/ishak6/BengaliBookAI.github.io/releases/download/book-sample/cover.jpg");
+  assert.equal("storage_key" in data.books[0], false);
+});
+
+test("PDF proxy forwards byte ranges and preserves partial response headers", async () => {
+  const originalFetch = globalThis.fetch;
+  let receivedRange = null;
+  globalThis.fetch = async (_url, init) => {
+    receivedRange = init.headers.Range;
+    return new Response("partial", { status: 206, headers: {
+      "content-type": "application/pdf", "content-range": "bytes 0-6/100",
+      "content-length": "7", "accept-ranges": "bytes"
+    }});
+  };
+  try {
+    const env = {
+      DB: {
+        prepare() {
+          return { bind() { return { async first() { return {
+            title: "Sample Book",
+            storage_key: "https://github.com/ishak6/BengaliBookAI.github.io/releases/download/book-sample/sample.pdf"
+          }; } }; } };
+        }
+      }
+    };
+    const response = await worker.fetch(makeRequest("/api/books/sample-book/file", {
+      headers: { Range: "bytes=0-6" }
+    }), env);
+    assert.equal(receivedRange, "bytes=0-6");
+    assert.equal(response.status, 206);
+    assert.equal(response.headers.get("content-range"), "bytes 0-6/100");
+    assert.equal(response.headers.get("accept-ranges"), "bytes");
+    assert.equal(response.headers.get("vary"), "Range");
+    assert.equal(await response.text(), "partial");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
