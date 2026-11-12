@@ -1,0 +1,58 @@
+name: Bengali Book AI API Smoke Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/api-smoke-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Worker health and configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://bengali-book-ai-api.bengalibookai.workers.dev"
+          curl --fail --silent --show-error "$BASE/health" -o health.json
+          python - <<'PY'
+          import json
+          d=json.load(open("health.json",encoding="utf-8"))
+          print(json.dumps(d,ensure_ascii=False,indent=2))
+          assert d.get("ok") is True, "Worker health check failed"
+          assert d.get("databaseConfigured") is True, "D1 binding is missing"
+          PY
+      - name: Check books endpoint and response shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://bengali-book-ai-api.bengalibookai.workers.dev"
+          curl --fail --silent --show-error "$BASE/api/books" -o books.json
+          python - <<'PY'
+          import json
+          d=json.load(open("books.json",encoding="utf-8"))
+          print(json.dumps(d,ensure_ascii=False,indent=2))
+          assert isinstance(d.get("books"),list), "Expected books array"
+          print("Ready books:",len(d["books"]))
+          PY
+      - name: Check ask endpoint safely without adding fake books
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://bengali-book-ai-api.bengalibookai.workers.dev"
+          code=$(curl --silent --show-error -o ask.json -w "%{http_code}" -H "Content-Type: application/json" -d '{"question":"বাংলা সাহিত্যের পরিচয় কী?"}' "$BASE/api/ask")
+          echo "HTTP $code"
+          cat ask.json
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          d=json.load(open("ask.json",encoding="utf-8"))
+          assert d.get("ok") is True, "Ask API returned an application error"
+          assert isinstance(d.get("sources"),list), "Sources array missing"
+          PY
