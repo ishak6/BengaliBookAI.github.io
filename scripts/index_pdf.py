@@ -10,6 +10,7 @@ import fitz
 from io import BytesIO
 from PIL import Image, ImageOps
 import pytesseract
+from ocr_quality import needs_ocr, choose_text
 
 API = os.environ.get("WORKER_API_URL", "https://bengali-book-ai-api.bengalibookai.workers.dev").rstrip("/")
 TOKEN = os.environ["WORKER_ADMIN_API_TOKEN"]
@@ -53,7 +54,7 @@ def main() -> None:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     if doc.page_count < 1 or doc.page_count > 2500:
         raise SystemExit(f"Unsupported page count: {doc.page_count}; allowed range is 1–2500.")
-    print(f"Extracting text from {doc.page_count} pages…")
+    print(f"Extracting text from {doc.page_count} pages with native-text quality checks…")
     batch = []
     total_chars = 0
     indexed = 0
@@ -70,8 +71,8 @@ def main() -> None:
         nonlocal_dummy = None
         page_number, native_text, future = item
         ocr_text = future.result() if future else ""
-        chosen = ocr_text if len(ocr_text) > len(native_text) else native_text
-        return page_number, chosen, bool(future and ocr_text and len(ocr_text) > len(native_text))
+        chosen = choose_text(native_text, ocr_text) if future else native_text
+        return page_number, chosen, bool(future and ocr_text and chosen == ocr_text)
 
     def save_page(item):
         nonlocal_state = item
@@ -94,8 +95,9 @@ def main() -> None:
         for index, page in enumerate(doc, start=1):
             native = "\n".join(line.rstrip() for line in page.get_text("text").strip().splitlines())
             future = None
-            if len(native) < 40:
-                pix = page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False, colorspace=fitz.csGRAY)
+            if needs_ocr(native):
+                # 2.0x gives Tesseract more glyph detail for Bengali matras and conjuncts.
+                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0), alpha=False, colorspace=fitz.csGRAY)
                 future = pool.submit(run_ocr, pix.tobytes("png"))
             pending.append((index, native, future))
             if len(pending) >= 4:
@@ -108,6 +110,7 @@ def main() -> None:
     doc.close()
     if indexed == 0:
         raise SystemExit("No selectable or OCR text found in this PDF; it was not marked ready.")
+    print(f"OCR used on {ocr_pages} pages; extracted {total_chars} characters.")
     result = post(f"/api/admin/books/{BOOK_ID}/complete", {})
     print(json.dumps({"ok": True, "book_id": BOOK_ID, "pages_indexed": indexed, "ocr_pages": ocr_pages,
                       "characters_extracted": total_chars, "final": result}, ensure_ascii=False, indent=2))
