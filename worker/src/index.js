@@ -37,7 +37,7 @@ async function uploadPdf(r,e){
   return json({ok:true,book:{id,title,status:"processing"},message:"PDF uploaded and indexing workflow dispatched."},202);
  }catch(err){console.error("PDF upload pipeline failed",err);return json({error:"Upload pipeline failed: "+String(err.message||err).slice(0,300)},502)}
 }
-\nasync function addPages(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
+async function addPages(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
 const exists=await e.DB.prepare("SELECT id FROM books WHERE id=?").bind(id).first();if(!exists)return json({error:"Book not found"},404);
 const q=[];for(const p of b.pages){const n=Number(p.page_number),c=String(p.content||"").trim();if(!Number.isInteger(n)||n<1||!c||c.length>18000)return json({error:"Invalid page number or content length"},400);q.push(e.DB.prepare("INSERT INTO book_pages(book_id,page_number,chapter,content) VALUES(?,?,?,?) ON CONFLICT(book_id,page_number) DO UPDATE SET chapter=excluded.chapter,content=excluded.content").bind(id,n,String(p.chapter||"").slice(0,240)||null,c))}
 try{await e.DB.batch(q);return json({ok:true,book_id:id,received_pages:q.length})}catch(err){console.error(err);return json({error:"Page batch failed"},503)}}
