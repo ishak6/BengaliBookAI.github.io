@@ -7,6 +7,8 @@ on:
       - "index.html"
       - "admin.html"
       - "scripts/index_pdf.py"
+      - "worker/package.json"
+      - "worker/test/**"
       - ".github/workflows/index-pdf.yml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
