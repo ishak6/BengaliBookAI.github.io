@@ -16,7 +16,7 @@ if(!id||!title||title.length>240||!["public_domain","open_license","permission_g
 try{await e.DB.prepare("INSERT INTO books(id,title,author,language,source_url,rights_type,rights_note,storage_key,status) VALUES(?,?,?,'bn',?,?,?,?,'processing')").bind(id,title,String(b.author||"").slice(0,200)||null,String(b.source_url||"").slice(0,1000)||null,rights,note.slice(0,1000),url).run();return json({ok:true,book:{id,title,status:"processing"}} ,201)}catch(err){return json({error:String(err).includes("UNIQUE")?"Book ID already exists":"Could not register book"},409)}}
 
 async function uploadPdf(r,e){
- if(!admin(r,e))return json({error:"Unauthorized"},401);
+ if(!await isAdmin(r,e))return json({error:"Unauthorized"},401);
  if(!e.GITHUB_API_TOKEN)return json({error:"Upload service is not configured. Admin must add GITHUB_API_TOKEN and sync Worker secrets once."},503);
  let form;try{form=await r.formData()}catch{return json({error:"Invalid multipart upload"},400)}
  const file=form.get("pdf");
@@ -43,11 +43,11 @@ async function uploadPdf(r,e){
   return json({ok:true,book:{id,title,status:"processing"},message:"PDF uploaded and indexing workflow dispatched."},202);
  }catch(err){console.error("PDF upload pipeline failed",err);return json({error:"Upload pipeline failed: "+String(err.message||err).slice(0,300)},502)}
 }
-async function addPages(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
+async function addPages(r,e,id){if(!await isAdmin(r,e))return json({error:"Unauthorized"},401);let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}if(!Array.isArray(b.pages)||!b.pages.length||b.pages.length>25)return json({error:"Send 1-25 pages"},400);
 const exists=await e.DB.prepare("SELECT id FROM books WHERE id=?").bind(id).first();if(!exists)return json({error:"Book not found"},404);
 const q=[];for(const p of b.pages){const n=Number(p.page_number),c=String(p.content||"").trim();if(!Number.isInteger(n)||n<1||!c||c.length>18000)return json({error:"Invalid page number or content length"},400);q.push(e.DB.prepare("INSERT INTO book_pages(book_id,page_number,chapter,content) VALUES(?,?,?,?) ON CONFLICT(book_id,page_number) DO UPDATE SET chapter=excluded.chapter,content=excluded.content").bind(id,n,String(p.chapter||"").slice(0,240)||null,c))}
 try{await e.DB.batch(q);return json({ok:true,book_id:id,received_pages:q.length})}catch(err){console.error(err);return json({error:"Page batch failed"},503)}}
-async function completeBook(r,e,id){if(!admin(r,e))return json({error:"Unauthorized"},401);const n=await e.DB.prepare("SELECT COUNT(*) count FROM book_pages WHERE book_id=?").bind(id).first();if(!n||Number(n.count)<1)return json({error:"No indexed pages"},409);await e.DB.prepare("UPDATE books SET status='ready',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({ok:true,book_id:id,status:"ready",indexed_pages:Number(n.count)})}
+async function completeBook(r,e,id){if(!await isAdmin(r,e))return json({error:"Unauthorized"},401);const n=await e.DB.prepare("SELECT COUNT(*) count FROM book_pages WHERE book_id=?").bind(id).first();if(!n||Number(n.count)<1)return json({error:"No indexed pages"},409);await e.DB.prepare("UPDATE books SET status='ready',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();return json({ok:true,book_id:id,status:"ready",indexed_pages:Number(n.count)})}
 function fts(q){const w=[...new Set(q.match(/[\p{L}\p{N}]+/gu)||[])].filter(x=>[...x].length>=2).slice(0,8);return w.map(x=>`"${x.replace(/"/g,'""')}"*`).join(" OR ")}
 async function ask(r,e){let b;try{b=await r.json()}catch{return json({error:"Invalid JSON"},400)}const q=String(b.question||"").trim();if(!q||q.length>1200)return json({error:"প্রশ্ন ১-১২০০ অক্ষরের মধ্যে লিখুন"},400);
 let rows=[];const match=fts(q);if(match){try{const x=await e.DB.prepare("SELECT p.book_id,p.page_number,p.chapter,p.content,b.title,b.author FROM book_pages_fts f JOIN book_pages p ON p.id=f.rowid JOIN books b ON b.id=p.book_id WHERE book_pages_fts MATCH ? AND b.status='ready' ORDER BY bm25(book_pages_fts) LIMIT 8").bind(match).all();rows=x.results||[]}catch(err){console.error("FTS search failed",err)}}
