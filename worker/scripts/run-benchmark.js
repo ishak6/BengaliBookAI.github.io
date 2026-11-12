@@ -20,7 +20,7 @@ const value = (flag, fallback) => {
 };
 const limit = Math.max(1, Math.min(dataset.questions.length, Number(value("--limit", dataset.questions.length)) || dataset.questions.length));
 const delayMs = Math.max(0, Math.min(10000, Number(value("--delay-ms", "1200")) || 0));
-const apiBase = String(value("--api-url", process.env.BENGALI_BOOK_AI_API || "https://bengali-book-ai-api.bengalibookai.workers.dev")).replace(/\\/+$/, "");
+const apiBase = String(value("--api-url", process.env.BENGALI_BOOK_AI_API || "https://bengali-book-ai-api.bengalibookai.workers.dev")).replace(/\/+$/, "");
 const endpoint = apiBase.endsWith("/api/ask") ? apiBase : apiBase + "/api/ask";
 
 if (!has("--run")) {
@@ -79,8 +79,8 @@ const report = {
 };
 const outputPath = resolve(here, "../benchmark/results", "benchmark-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json");
 await mkdir(dirname(outputPath), { recursive: true });
-await writeFile(outputPath, JSON.stringify(report, null, 2) + "\\n", "utf8");
-console.log("\\nSUMMARY");
+await writeFile(outputPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+console.log("\nSUMMARY");
 console.log(JSON.stringify(summary, null, 2));
 console.log("Report saved:", outputPath);
 if (results.some(result => result.error)) process.exitCode = 2;
