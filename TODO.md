@@ -2,28 +2,34 @@
 
 শেষ আপডেট: 2026-11-13
 
-এই ফাইলে বাস্তব কাজের অবস্থা রাখা হবে। যাচাই ছাড়া কোনো কাজ Done করা যাবে না।
+যাচাই ছাড়া কোনো কাজ Done করা যাবে না।
 
 ## কোডে যুক্ত
-- [x] Bengali ও English Tesseract OCR language package install এবং workflow-এ language verification.
+- [x] Bengali ও English Tesseract OCR language package install ও workflow-এ language verification.
 - [x] Native PDF text quality কম হলে OCR fallback.
 - [x] Tesseract PSM 6 ও PSM 11 ফল তুলনা করে text নির্বাচন.
 - [x] Worker page batch upload-এ transient HTTP retry এবং accepted page count যাচাই.
-- [x] OCR quality unit tests এবং Python syntax validation workflow-এ চালানো.
+- [x] OCR quality unit tests ও Python syntax validation CI-তে চালানো.
+- [x] সর্বশেষ Quality Harness run সফল: https://github.com/ishak6/BengaliBookAI.github.io/actions/runs/43422722782
 
-## যাচাই বাকি
-- [ ] নতুন Index PDF workflow GitHub Actions-এ বাস্তবে সফলভাবে চালানো.
-- [ ] আগে upload করা দুই PDF-এর প্রত্যেকটির Actions run, indexed page count এবং Worker book status পরীক্ষা করা.
-- [ ] Bengali scanned PDF থেকে কয়েকটি page text হাতে যাচাই করা; matra, যুক্তাক্ষর, page order ও citation মিলিয়ে দেখা.
-- [ ] Human-verified Bengali PDF OCR benchmark তৈরি করা.
-- [ ] বড় ও mixed native-text/scanned PDF-এ runtime এবং memory পরীক্ষা করা.
-- [ ] Production D1-এ indexed page count এবং ready status মিলিয়ে দেখা.
+## বাস্তব PDF indexing — এখনও অসম্পন্ন
+- [ ] Index PDF workflow-এর বাস্তব run সফলভাবে চালানো.
+- [ ] আগে upload করা দুই PDF-এর প্রত্যেকটির Book ID, indexed page count এবং Worker/D1 status যাচাই.
+- [ ] Bengali scanned PDF-এর page text হাতে যাচাই: মাত্রা, যুক্তাক্ষর, page order ও citation.
+- [ ] Human-verified Bengali OCR benchmark তৈরি.
+- [ ] বড় ও mixed native-text/scanned PDF-এ runtime ও memory পরীক্ষা.
+
+## GitHub-এ পাওয়া তথ্য
+- [x] Releases-এ দুইটি PDF asset পাওয়া গেছে: Students.hack.pdf এবং দুধ ভাত — ইন্দিরা দেবী চৌধুরানী PDF.
+- [ ] এই দুটি release asset-কে admin library-র সঠিক Book ID ও status-এর সঙ্গে মিলিয়ে দেখা বাকি.
+- [ ] সর্বশেষ repository Actions তালিকায় Index PDF workflow-এর কোনো run পাওয়া যায়নি; তাই বাস্তব OCR/indexing সফল বলা যাচ্ছে না.
 
 ## নির্ভরতা / বাধা
-- Repository secret WORKER_ADMIN_API_TOKEN সঠিক থাকতে হবে.
-- GitHub Actions GITHUB_TOKEN-এর Contents write permission cover asset upload-এর জন্য প্রয়োজন.
-- Cloudflare Worker এবং D1 production-এ সচল থাকতে হবে.
-- OCR accuracy scan resolution, page skew, contrast, font ও language mix-এর ওপর নির্ভরশীল.
+- Manual Index PDF run-এর জন্য প্রতিটি বইয়ের সঠিক Book ID ও release URL প্রয়োজন.
+- Worker Admin API access-এর জন্য WORKER_ADMIN_API_TOKEN secret থাকতে হবে.
+- Cover upload-এর জন্য Actions GITHUB_TOKEN-এ contents:write permission প্রয়োজন.
+- Cloudflare Worker ও D1 production-এ সচল থাকতে হবে.
+- বর্তমান GitHub connection দিয়ে workflow_dispatch চালু করার write action উপলব্ধ নয়; তাই এই run এখান থেকে trigger করা যায়নি.
 - বাস্তব PDF run না হওয়া পর্যন্ত production OCR verified বলা যাবে না.
 
 ## কাজের সীমা
